@@ -501,8 +501,7 @@ async def on_message(message: discord.Message):
 
             except Exception as e:
                 print(f"[LỖI ON_MESSAGE SERVER] Xử lý tin nhắn {message.id}: {e}")
-                # traceback.print_exc()
-
+           
 
     # --- Xử lý tin nhắn DM từ ADMIN ---
     elif isinstance(message.channel, discord.DMChannel) and message.author.id == ADMIN_USER_ID:

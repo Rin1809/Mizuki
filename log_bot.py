@@ -1,122 +1,188 @@
 import discord
 import os
 import datetime
-from dotenv import load_dotenv # Giữ lại để có thể chạy thử local với file .env
+import psycopg2 
+from dotenv import load_dotenv
+import asyncio 
 
 # --- Cấu hình ---
-# Tải biến môi trường từ file .env (nếu có, hữu ích khi chạy local)
-# Trên Railway, biến môi trường sẽ được cung cấp trực tiếp
 load_dotenv()
-
-# Lấy token từ biến môi trường. Đây là cách an toàn và cần thiết cho Railway.
 TOKEN = os.getenv('DISCORD_TOKEN')
+DATABASE_URL = os.getenv('DATABASE_URL')
+conn = None
+cursor = None
 
 # --- Khởi tạo Bot ---
-# Xác định các Intents cần thiết. BẮT BUỘC phải bật trên Discord Developer Portal!
 intents = discord.Intents.default()
-intents.messages = True        # Cho phép nhận sự kiện tin nhắn
-intents.message_content = True # Cho phép đọc NỘI DUNG tin nhắn (Privileged Intent)
-intents.guilds = True          # Cho phép truy cập thông tin server/kênh
-intents.members = True         # Cho phép truy cập thông tin thành viên (Privileged Intent - hữu ích để lấy tên đầy đủ)
+intents.messages = True
+intents.message_content = True
+intents.guilds = True
+intents.members = True 
 
-# Tạo đối tượng bot với các Intents đã khai báo
 client = discord.Client(intents=intents)
 
-# --- Sự kiện Bot ---
+# --- Hàm Kết nối và Thiết lập Database ---
+async def setup_database():
+    """Kết nối đến database và tạo bảng nếu chưa tồn tại."""
+    global conn, cursor
+    if not DATABASE_URL:
+        print("LỖI: Biến môi trường DATABASE_URL chưa được đặt.")
+        return False
 
+    try:
+        print("Đang kết nối đến PostgreSQL...")
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        print("Đã kết nối PostgreSQL thành công.")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS discord_logs (
+                message_id BIGINT PRIMARY KEY,
+                timestamp TIMESTAMPTZ NOT NULL,
+                server_id BIGINT,
+                server_name TEXT,
+                channel_id BIGINT,
+                channel_name TEXT,
+                author_id BIGINT,
+                author_name TEXT,
+                content TEXT,
+                attachment_urls TEXT
+            )
+        """)
+        conn.commit() 
+        print("Bảng 'discord_logs' đã được kiểm tra/tạo.")
+        return True
+    except psycopg2.Error as e:
+        print(f"LỖI: Không thể kết nối hoặc thiết lập database: {e}")
+        if conn:
+            conn.close() # Đóng kết nối nếu có lỗi xảy ra
+        conn = None
+        cursor = None
+        return False
+    except Exception as e:
+        print(f"LỖI không xác định khi thiết lập database: {e}")
+        return False
+
+async def close_database():
+    """Đóng kết nối database khi bot tắt."""
+    global conn, cursor
+    if cursor:
+        cursor.close()
+        print("Đã đóng con trỏ database.")
+    if conn:
+        conn.close()
+        print("Đã đóng kết nối database.")
+
+# --- Hàm Ghi Log vào Database ---
+def log_message_to_db(message):
+    """Ghi thông tin tin nhắn vào database."""
+    global conn, cursor
+    if not conn or not cursor:
+        print("CẢNH BÁO: Mất kết nối database, không thể ghi log.")
+        return
+
+    # Chuẩn bị dữ liệu
+    message_id = message.id
+    timestamp = message.created_at # discord.py trả về datetime timezone-aware (UTC)
+    server_id = message.guild.id if message.guild else None
+    server_name = message.guild.name if message.guild else 'Direct Message'
+    channel_id = message.channel.id
+    channel_name = message.channel.name if hasattr(message.channel, 'name') else f'DM with {message.author}'
+    author_id = message.author.id
+    author_name = str(message.author) # "Username#Discriminator"
+    content = message.content
+    # Ghép các URL đính kèm thành một chuỗi, phân tách bằng dấu phẩy hoặc ký tự khác
+    attachment_urls = ", ".join([att.url for att in message.attachments]) if message.attachments else None
+
+    # Câu lệnh SQL INSERT (sử dụng placeholders %s để tránh SQL injection)
+    sql = """
+        INSERT INTO discord_logs (
+            message_id, timestamp, server_id, server_name, channel_id,
+            channel_name, author_id, author_name, content, attachment_urls
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (message_id) DO NOTHING; -- Bỏ qua nếu message_id đã tồn tại (hiếm khi xảy ra với on_message)
+    """
+    # Dữ liệu dạng tuple theo đúng thứ tự placeholders
+    data = (
+        message_id, timestamp, server_id, server_name, channel_id,
+        channel_name, author_id, author_name, content, attachment_urls
+    )
+
+    try:
+        cursor.execute(sql, data)
+        conn.commit()
+
+    except psycopg2.Error as e:
+        print(f"LỖI DB khi ghi log tin nhắn {message_id}: {e}")
+        conn.rollback()
+
+    except Exception as e:
+        print(f"LỖI không xác định khi ghi log DB: {e}")
+        conn.rollback()
+
+
+# --- Sự kiện Bot ---
 @client.event
 async def on_ready():
-    """
-    Sự kiện được kích hoạt một lần khi bot đã kết nối thành công
-    với Discord và sẵn sàng hoạt động.
-    """
-    print(f'--------------------------------------------------')
-    print(f'Đã đăng nhập thành công với tư cách:')
-    print(f'Tên Bot: {client.user.name}')
-    print(f'ID Bot : {client.user.id}')
-    print(f'--------------------------------------------------')
-    print(f'Bot đang lắng nghe tin nhắn và sẽ in logs ra console...')
-    print('--------------------------------------------------')
+    """Sự kiện khi bot kết nối thành công."""
+    print(f'Đã đăng nhập với tư cách {client.user.name} (ID: {client.user.id})')
+    print('------')
+    # Thiết lập kết nối database khi bot sẵn sàng
+    if not await setup_database():
+        print("LỖI NGHIÊM TRỌNG: Không thể thiết lập database. Bot có thể không hoạt động đúng.")
+
+    else:
+        print("Bot đã sẵn sàng ghi log vào database.")
+
 
 @client.event
 async def on_message(message):
-    """
-    Sự kiện được kích hoạt mỗi khi có một tin nhắn mới được gửi
-    trong bất kỳ kênh nào mà bot có thể thấy.
-    """
-    # 1. Bỏ qua tin nhắn từ chính bot để tránh vòng lặp vô hạn
+    """Sự kiện khi có tin nhắn mới."""
+    # Bỏ qua tin nhắn từ chính bot
     if message.author == client.user:
         return
+    log_message_to_db(message)
 
-    # 2. Chỉ xử lý tin nhắn trong server (Guild), bỏ qua tin nhắn riêng (DM)
-    if message.guild is None:
-        print(f"[DM] [{message.author}]: {message.content[:50]}...") # Tùy chọn: Log cả DM nếu muốn
-        return
+@client.event
+async def on_disconnect():
+    """Sự kiện khi bot mất kết nối."""
+    print("Bot đã mất kết nối với Discord.")
+    # Không cần đóng DB ở đây vì có thể kết nối lại
 
-    # 3. Lấy thông tin cần thiết từ tin nhắn
-    try:
-        server_name = message.guild.name
-        # Đôi khi kênh bị xóa ngay sau khi nhắn, channel có thể là None
-        channel_name = message.channel.name if message.channel else "Kênh_Không_Xác_Định"
-
-        # Lấy thời gian tin nhắn được tạo (UTC) và định dạng nó
-        timestamp_utc = message.created_at
-        formatted_time = timestamp_utc.strftime("%Y-%m-%d %H:%M:%S UTC") # Định dạng chuẩn ISO 8601 dễ đọc
-
-        author_name = str(message.author) # Định dạng "Username#Discriminator"
-        content = message.content         # Nội dung tin nhắn
-        attachments = message.attachments # Danh sách các file đính kèm
-
-        # 4. Định dạng dòng log để in ra console
-        log_entry = f"[{formatted_time}] [{server_name} > #{channel_name}] [{author_name}]: {content}"
-
-        # Nếu có file đính kèm, thêm thông tin vào log
-        if attachments:
-            # Lấy danh sách tên file và URL (URL có thể hết hạn sau một thời gian)
-            attach_info = ", ".join([f"{att.filename} ({att.url})" for att in attachments])
-            log_entry += f" [Attachments: {attach_info}]"
-
-        # 5. In dòng log ra console (stdout)
-        # Railway sẽ tự động bắt output này và hiển thị trong phần Logs của service
-        print(log_entry)
-
-    except AttributeError as e:
-        # Xử lý trường hợp không thể truy cập thuộc tính nào đó (ví dụ: message.guild bị None?)
-        print(f"[ERROR] Không thể xử lý tin nhắn ID {message.id}. Lỗi thuộc tính: {e}")
-    except Exception as e:
-        # Bắt các lỗi không mong muốn khác trong quá trình xử lý tin nhắn
-        print(f"[ERROR] Lỗi không xác định khi xử lý tin nhắn ID {message.id}: {e}")
+@client.event
+async def on_resumed():
+    """Sự kiện khi bot kết nối lại thành công."""
+    print("Bot đã kết nối lại với Discord.")
+    # Kiểm tra và có thể thiết lập lại kết nối DB 
+    global conn
+    if conn is None or conn.closed != 0: # Kiểm tra nếu kết nối bị đóng
+        print("Kết nối database đã mất, đang thử kết nối lại...")
+        await setup_database()
 
 
 # --- Chạy Bot ---
-if __name__ == "__main__":
-    print("Đang khởi động bot...")
+async def main():
     if TOKEN is None:
-        print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        print("LỖI NGHIÊM TRỌNG: Không tìm thấy biến môi trường 'DISCORD_TOKEN'.")
-        print("Trên Railway: Hãy đảm bảo bạn đã thêm biến 'DISCORD_TOKEN' trong tab 'Variables'.")
-        print("Khi chạy local: Hãy đảm bảo bạn có file '.env' chứa 'DISCORD_TOKEN=YourTokenHere'.")
-        print("Bot không thể khởi động.")
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
-    else:
+        print("LỖI: Không tìm thấy DISCORD_TOKEN trong biến môi trường.")
+        return
+    if DATABASE_URL is None:
+         print("LỖI: Không tìm thấy DATABASE_URL trong biến môi trường.")
+
+
+    async with client:
         try:
-            # Chạy bot bằng token đã lấy được
-            client.run(TOKEN)
+            await client.start(TOKEN)
         except discord.errors.LoginFailure:
-            print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            print("LỖI: Token Discord không hợp lệ.")
-            print("Vui lòng kiểm tra lại giá trị của biến môi trường 'DISCORD_TOKEN'.")
-            print("Token có thể đã bị thay đổi hoặc nhập sai.")
-            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+            print("LỖI: Token không hợp lệ.")
         except discord.errors.PrivilegedIntentsRequired:
-            print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            print("LỖI: Bot thiếu Privileged Gateway Intents.")
-            print("Vui lòng truy cập Discord Developer Portal -> Application của bạn -> Tab 'Bot'.")
-            print("Bật CẢ HAI tùy chọn: 'MESSAGE CONTENT INTENT' và 'SERVER MEMBERS INTENT'.")
-            print("Sau đó lưu thay đổi và deploy lại bot trên Railway (hoặc khởi động lại nếu chạy local).")
-            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+             print("LỖI: Bot yêu cầu Privileged Gateway Intents.")
         except Exception as e:
-            # Bắt các lỗi khác có thể xảy ra khi khởi động (ví dụ: lỗi mạng)
-            print(f"\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            print(f"LỖI KHÔNG XÁC ĐỊNH KHI KHỞI ĐỘNG BOT: {e}")
-            print(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+            print(f"Đã xảy ra lỗi không xác định khi chạy bot: {e}")
+        finally:
+            # Đảm bảo đóng kết nối DB khi bot dừng hẳn
+            await close_database()
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Đã nhận tín hiệu dừng (Ctrl+C). Đang tắt bot...")

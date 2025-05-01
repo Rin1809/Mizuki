@@ -277,7 +277,7 @@ async def on_message(message: discord.Message):
                     # Lần 2: Mute + Reset count
                     mute_minutes = 1
                     mute_duration = datetime.timedelta(minutes=mute_minutes)
-                    mute_msg = f"Đã bảo là đừng nói xấu {TARGET_USERNAME} rồi mà {message.author.mention}! Tui mute {mute_minutes} phút để bình tĩnh lại nha. 😠"
+                    mute_msg = f"Đã bảo là đừng nói xấu {TARGET_USERNAME} rồi mà {message.author.mention}! Tui mute {mute_minutes} phút để bình tĩnh lại nhá."
                     try:
                         await message.channel.send(mute_msg) # Thông báo trước khi mute
                         await message.author.timeout(mute_duration, reason=f"Nói xấu {TARGET_USERNAME} lần 2")

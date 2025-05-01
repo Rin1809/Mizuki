@@ -1,0 +1,16 @@
+
+.env
+
+# Thư mục log
+server_logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE/Editor specific
+.vscode/
+.idea/

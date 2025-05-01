@@ -3,23 +3,35 @@ import os
 import datetime
 import psycopg2 
 from dotenv import load_dotenv
-import asyncio 
-import time 
+import asyncio
+import time
 import google.generativeai as genai
-
 
 # --- Cấu hình Cơ bản & Database ---
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 DATABASE_URL = os.getenv('DATABASE_URL')
+ADMIN_USER_ID_STR = os.getenv('ADMIN_USER_ID') # Lấy ID Admin từ biến môi trường
 
 # --- Cấu hình AI ---
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-TARGET_USERNAME = "Rin" 
-AI_MODEL_NAME = "gemini-2.0-flash"
-AI_CALL_COOLDOWN = 2 #
+TARGET_USERNAMES = ["rin", "am_lyn_"]
+AI_MODEL_NAME = "gemini-1.5-flash-latest"
+AI_CALL_COOLDOWN = 3 # Giây - Giãn cách gọi API Gemini
 
-# Biến toàn cục cho kết nối DB và AI model
+# --- Chuyển đổi ID Admin ---
+ADMIN_USER_ID = None
+if ADMIN_USER_ID_STR:
+    try:
+        ADMIN_USER_ID = int(ADMIN_USER_ID_STR)
+        print(f"Đã cấu hình gửi DM tới Admin ID: {ADMIN_USER_ID}")
+    except ValueError:
+        print("LỖI: ADMIN_USER_ID không phải là số hợp lệ.")
+else:
+    print("CẢNH BÁO: ADMIN_USER_ID chưa được đặt. Bot sẽ không thể gửi DM.")
+
+
+# Biến toàn cục
 conn = None
 cursor = None
 ai_model = None
@@ -28,27 +40,25 @@ last_ai_call_time = 0
 # --- Khởi tạo Bot Discord ---
 intents = discord.Intents.default()
 intents.messages = True
-intents.message_content = True 
+intents.message_content = True # BẮT BUỘC
 intents.guilds = True
-intents.members = True # BẮT BUỘC để thực hiện timeout/mute
+# intents.members = True # Không cần quyền members nữa nếu chỉ gửi DM
 
 client = discord.Client(intents=intents)
 
 # --- Hàm Kết nối và Thiết lập Database ---
 async def setup_database():
-    """Kết nối đến database và tạo bảng nếu chưa tồn tại."""
     global conn, cursor
     if not DATABASE_URL:
-        print("LỖI: Biến môi trường DATABASE_URL chưa được đặt.")
+        print("LỖI: DATABASE_URL chưa được đặt.")
         return False
-
     try:
         print("Đang kết nối đến PostgreSQL...")
-        conn = psycopg2.connect(DATABASE_URL)
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=10)
+        conn.autocommit = True 
         cursor = conn.cursor()
         print("Đã kết nối PostgreSQL thành công.")
-
-        # Tạo bảng discord_logs (nếu chưa có)
+        # Chỉ tạo bảng discord_logs
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS discord_logs (
                 message_id BIGINT PRIMARY KEY, timestamp TIMESTAMPTZ NOT NULL,
@@ -56,20 +66,14 @@ async def setup_database():
                 author_id BIGINT, author_name TEXT, content TEXT, attachment_urls TEXT
             )
         """)
-
-        # Tạo bảng user_warnings (nếu chưa có)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_warnings (
-                id SERIAL PRIMARY KEY, user_id BIGINT NOT NULL, guild_id BIGINT NOT NULL,
-                warn_reason VARCHAR(100) NOT NULL, warn_count INTEGER NOT NULL DEFAULT 0,
-                last_warned_at TIMESTAMPTZ, UNIQUE (user_id, guild_id, warn_reason)
-            )
-        """)
-        conn.commit()
-        print("Các bảng 'discord_logs' và 'user_warnings' đã được kiểm tra/tạo.")
+        print("Bảng 'discord_logs' đã được kiểm tra/tạo.")
         return True
+    except psycopg2.OperationalError as e:
+         print(f"LỖI DB: Không thể kết nối (OperationalError): {e}")
+         conn, cursor = None, None
+         return False
     except psycopg2.Error as e:
-        print(f"LỖI DB: Không thể kết nối hoặc thiết lập bảng: {e}")
+        print(f"LỖI DB: Không thể thiết lập bảng discord_logs: {e}")
         if conn: conn.close()
         conn, cursor = None, None
         return False
@@ -84,13 +88,21 @@ async def close_database():
     if conn: conn.close(); print("Đã đóng kết nối DB.")
     conn, cursor = None, None
 
-# --- Hàm Ghi Log vào Database ---
-def log_message_to_db(message):
-    """Ghi thông tin tin nhắn vào bảng discord_logs."""
+# --- Hàm Ghi Log vào Database (Giữ nguyên) ---
+def log_message_to_db_sync(message):
     global conn, cursor
+    # Thử kết nối lại nếu bị mất (logic đơn giản)
+    if conn is None or conn.closed != 0:
+        print("Mất kết nối DB, đang thử kết nối lại để ghi log...")
+        if not asyncio.run(setup_database()):
+             print("Không thể kết nối lại DB để ghi log.")
+             return
+
+
     if not conn or not cursor or conn.closed != 0:
-        print("CẢNH BÁO: Mất kết nối DB, không thể ghi log tin nhắn.")
-        return
+         print("CẢNH BÁO: Vẫn mất kết nối DB, bỏ qua ghi log tin nhắn.")
+         return
+
 
     data = (
         message.id, message.created_at,
@@ -109,77 +121,30 @@ def log_message_to_db(message):
     """
     try:
         cursor.execute(sql, data)
-        conn.commit()
+ 
     except psycopg2.Error as e:
         print(f"LỖI DB khi ghi log msg {message.id}: {e}")
-        conn.rollback()
+
     except Exception as e:
         print(f"LỖI không xác định khi ghi log DB: {e}")
-        conn.rollback()
 
-# --- Hàm tương tác DB cho Warnings ---
-def get_warning_count_sync(user_id: int, guild_id: int, reason: str) -> int:
-    """Lấy số lần cảnh báo (phiên bản đồng bộ để chạy trong executor)."""
-    global conn, cursor
-    if not conn or not cursor or conn.closed != 0: return 0
-    try:
-        sql = "SELECT warn_count FROM user_warnings WHERE user_id = %s AND guild_id = %s AND warn_reason = %s;"
-        cursor.execute(sql, (user_id, guild_id, reason))
-        result = cursor.fetchone()
-        return result[0] if result else 0
-    except psycopg2.Error as e:
-        print(f"Lỗi DB khi lấy warning count sync: {e}")
-        conn.rollback()
-        return 0
 
-def increment_warning_count_sync(user_id: int, guild_id: int, reason: str):
-    """Tăng số lần cảnh báo (phiên bản đồng bộ)."""
-    global conn, cursor
-    if not conn or not cursor or conn.closed != 0: return
-    try:
-        now = datetime.datetime.now(datetime.timezone.utc)
-        sql = """
-            INSERT INTO user_warnings (user_id, guild_id, warn_reason, warn_count, last_warned_at)
-            VALUES (%s, %s, %s, 1, %s)
-            ON CONFLICT (user_id, guild_id, warn_reason)
-            DO UPDATE SET warn_count = user_warnings.warn_count + 1, last_warned_at = EXCLUDED.last_warned_at;
-        """
-        cursor.execute(sql, (user_id, guild_id, reason, now))
-        conn.commit()
-    except psycopg2.Error as e:
-        print(f"Lỗi DB khi tăng warning count sync: {e}")
-        conn.rollback()
-
-def reset_warning_count_sync(user_id: int, guild_id: int, reason: str):
-    """Reset số lần cảnh báo về 0 (phiên bản đồng bộ)."""
-    global conn, cursor
-    if not conn or not cursor or conn.closed != 0: return
-    try:
-        sql = "UPDATE user_warnings SET warn_count = 0 WHERE user_id = %s AND guild_id = %s AND warn_reason = %s;"
-        cursor.execute(sql, (user_id, guild_id, reason))
-        conn.commit()
-    except psycopg2.Error as e:
-        print(f"Lỗi DB khi reset warning count sync: {e}")
-        conn.rollback()
-
-# --- Hàm Phân tích AI Gemini ---
-async def is_negative_towards_target(message_content: str) -> bool:
-    """Kiểm tra tin nhắn có tiêu cực về TARGET_USERNAME không."""
+# --- Hàm Phân tích AI Gemini (Cập nhật Prompt) ---
+async def check_message_relevance(message_content: str) -> bool:
+    """Kiểm tra xem tin nhắn có đề cập hoặc liên quan tiêu cực đến các tên mục tiêu không."""
     global last_ai_call_time, ai_model
     current_time = time.time()
 
-    if not ai_model:
-        return False
-
-    # Cooldown API
-    if current_time - last_ai_call_time < AI_CALL_COOLDOWN:
-        return False
+    if not ai_model: return False
+    if current_time - last_ai_call_time < AI_CALL_COOLDOWN: return False
     last_ai_call_time = current_time
 
-    # Prompt rõ ràng, yêu cầu YES/NO
+    target_names_str = ", ".join([f"'{name}'" for name in TARGET_USERNAMES])
+
+
     prompt = f"""
-    Phân tích tin nhắn sau. Tin nhắn này có ý nói xấu, chỉ trích, lăng mạ, hoặc thể hiện thái độ tiêu cực dù là đùa giỡn, đối với người dùng tên '{TARGET_USERNAME}' không?
-    Chỉ trả lời bằng một từ duy nhất: "YES" nếu có, và "NO" nếu không hoặc không liên quan.
+    Phân tích tin nhắn sau. Tin nhắn này có vẻ đang nói xấu, chỉ trích, phàn nàn, hoặc thể hiện thái độ tiêu cực một cách rõ ràng về người dùng có tên nằm trong danh sách [{target_names_str}] không?
+    Chỉ cần trả lời bằng một từ duy nhất: "YES" nếu có vẻ liên quan tiêu cực, và "NO" nếu không hoặc không liên quan.
 
     Tin nhắn: "{message_content}"
 
@@ -189,16 +154,15 @@ async def is_negative_towards_target(message_content: str) -> bool:
     try:
         response = await ai_model.generate_content_async(
              contents=[prompt],
-             generation_config=genai.types.GenerationConfig(temperature=0.1)
+             generation_config=genai.types.GenerationConfig(temperature=0.2) 
         )
         analysis_result = response.text.strip().upper()
-    
-
-        return "YES" in analysis_result # Chỉ cần chứa "YES" là được
+        return "YES" in analysis_result
 
     except Exception as e:
         print(f"Lỗi khi gọi Gemini API: {e}")
-        return False # Mặc định là không tiêu cực nếu lỗi
+        # traceback.print_exc()
+        return False
 
 # --- Sự kiện Bot Discord ---
 @client.event
@@ -206,10 +170,8 @@ async def on_ready():
     """Sự kiện khi bot kết nối thành công."""
     print(f'Đã đăng nhập với tư cách {client.user.name} (ID: {client.user.id})')
     print('------')
-    # Thiết lập Database
     if not await setup_database():
-        print("LỖI NGHIÊM TRỌNG: Không thể thiết lập database.")
-
+        print("CẢNH BÁO: Không thể thiết lập database. Log tin nhắn sẽ không hoạt động.")
 
     # Thiết lập AI Client
     global ai_model
@@ -217,116 +179,96 @@ async def on_ready():
         try:
             genai.configure(api_key=GEMINI_API_KEY)
             ai_model = genai.GenerativeModel(AI_MODEL_NAME)
-            # Thử gọi API nhỏ để kiểm tra key và model
-            await ai_model.generate_content_async("Hello")
-            print(f"Đã cấu hình và kiểm tra Google Generative AI với model: {AI_MODEL_NAME}")
+            await ai_model.generate_content_async("Hello") # Test API key
+            print(f"Đã cấu hình Google Generative AI với model: {AI_MODEL_NAME}")
         except Exception as e:
-            print(f"LỖI: Không thể cấu hình hoặc kiểm tra Google AI: {e}")
-            ai_model = None # Vô hiệu hóa AI nếu lỗi
+            print(f"LỖI: Không thể cấu hình Google AI: {e}")
+            ai_model = None
     else:
         print("CẢNH BÁO: GEMINI_API_KEY chưa được đặt. Tính năng AI sẽ bị vô hiệu hóa.")
         ai_model = None
 
     print("Bot đã sẵn sàng!")
+    if not ADMIN_USER_ID:
+        print(">>> LƯU Ý: ADMIN_USER_ID chưa được cấu hình, bot không thể gửi DM thông báo! <<<")
 
 
 @client.event
 async def on_message(message: discord.Message):
-
-    # Bỏ qua tin nhắn từ chính bot hoặc DM
+    """Sự kiện khi có tin nhắn mới."""
+    # Bỏ qua tin nhắn từ bot hoặc DM
     if message.author.bot or message.guild is None:
         return
 
-    # ---- BƯỚC 1: Ghi log gốc vào DB ----
-    # Chạy DB log trong executor để không block event loop lâu
-    await client.loop.run_in_executor(None, log_message_to_db, message)
+    # --- BƯỚC 1: Ghi log gốc vào DB (chạy nền) ---
+    # Sử dụng create_task để không đợi log xong mới xử lý AI
+    asyncio.create_task(client.loop.run_in_executor(None, log_message_to_db_sync, message))
 
-    # ---- BƯỚC 2: Phân tích AI và Xử lý Cảnh báo/Mute ----
-    if ai_model: # Chỉ chạy nếu AI được cấu hình
+    # --- BƯỚC 2: Phân tích AI và Gửi DM cho Admin ---
+    if ai_model and ADMIN_USER_ID: 
         try:
-            is_negative = await is_negative_towards_target(message.content)
+            # Kiểm tra xem tin nhắn có vẻ tiêu cực về target không
+            is_relevant_negative = await check_message_relevance(message.content)
 
-            if is_negative:
-                print(f"Phát hiện nội dung tiêu cực về '{TARGET_USERNAME}' từ {message.author}: {message.content[:100]}...")
-                guild_id = message.guild.id
-                user_id = message.author.id
-                # Lý do nhất quán để truy vấn DB
-                warn_reason = f'negative_{TARGET_USERNAME.lower()}'
+            if is_relevant_negative:
+                print(f"Phát hiện tin nhắn có thể liên quan tiêu cực đến {TARGET_USERNAMES} từ {message.author}.")
 
-                # Lấy số lần cảnh báo hiện tại (chạy DB trong executor)
-                current_warnings = await client.loop.run_in_executor(
-                    None, get_warning_count_sync, user_id, guild_id, warn_reason
+                # Lấy đối tượng User của Admin
+                admin_user = client.get_user(ADMIN_USER_ID)
+                if not admin_user:
+                    try:
+                        admin_user = await client.fetch_user(ADMIN_USER_ID)
+                    except discord.NotFound:
+                        print(f"LỖI: Không tìm thấy Admin với ID {ADMIN_USER_ID}.")
+                        return # Không thể gửi DM nếu không tìm thấy admin
+                    except discord.HTTPException:
+                         print(f"LỖI: Lỗi mạng khi fetch Admin ID {ADMIN_USER_ID}.")
+                         return
+
+                # Tạo nội dung DM
+                dm_content = (
+                    f"**⚠️ Tin nhắn đáng chú ý về {', '.join(TARGET_USERNAMES)}:**\n"
+                    f"👤 **Người gửi:** {message.author.mention} (`{message.author}`)\n"
+                    f"📌 **Kênh:** {message.channel.mention} (`#{message.channel.name}`)\n"
+                    f"🔗 **Link:** {message.jump_url}\n"
+                    f"💬 **Nội dung:**\n```\n{message.content}\n```"
                 )
 
-                # --- Xử lý dựa trên số lần cảnh báo ---
-                if current_warnings == 0:
-                    # Lần 1: Cảnh báo + Tăng count
-                    warning_msg = f"Ê {message.author.mention}, đừng nói xấu {TARGET_USERNAME} nha! Lần đầu tui nhắc đó. 😉"
-                    try:
-                        await message.channel.send(warning_msg)
-                        await client.loop.run_in_executor(
-                            None, increment_warning_count_sync, user_id, guild_id, warn_reason
-                        )
-                        print(f"Đã cảnh báo lần 1 cho {message.author} về {warn_reason}.")
-                    except discord.Forbidden:
-                        print(f"Lỗi quyền: Không thể gửi tin nhắn vào kênh {message.channel.name}")
-                    except Exception as e:
-                        print(f"Lỗi khi gửi cảnh báo lần 1: {e}")
-
-                elif current_warnings == 1:
-                    # Lần 2: Mute + Reset count
-                    mute_minutes = 1
-                    mute_duration = datetime.timedelta(minutes=mute_minutes)
-                    mute_msg = f"Đã bảo là đừng nói xấu {TARGET_USERNAME} rồi mà {message.author.mention}! Tui mute {mute_minutes} phút để bình tĩnh lại nhá."
-                    try:
-                        await message.channel.send(mute_msg) # Thông báo trước khi mute
-                        await message.author.timeout(mute_duration, reason=f"Nói xấu {TARGET_USERNAME} lần 2")
-                        print(f"Đã mute {message.author} trong {mute_minutes} phút.")
-                        # Reset cảnh báo sau khi mute thành công
-                        await client.loop.run_in_executor(
-                            None, reset_warning_count_sync, user_id, guild_id, warn_reason
-                        )
-                        print(f"Đã reset cảnh báo cho {message.author} về {warn_reason}.")
-                    except discord.Forbidden:
-                        print(f"Lỗi quyền: Không thể Timeout/Mute {message.author}. Kiểm tra quyền 'Timeout Members' và vị trí role.")
-                        await message.channel.send(f" Định mute {message.author.mention} mà tui không có quyền 'Timeout Members' mất rồi... 😢")
-                    except discord.HTTPException as e:
-                        print(f"Lỗi HTTP khi mute {message.author}: {e}")
-                        await message.channel.send(f"Gặp lỗi khi mute {message.author.mention}, báo admin giùm tui nha.")
-                    except Exception as e:
-                        print(f"Lỗi không xác định khi xử lý mute lần 2: {e}")
-
+                # Gửi DM cho Admin
+                try:
+                    await admin_user.send(dm_content)
+                    print(f"Đã gửi DM thông báo cho Admin (ID: {ADMIN_USER_ID}).")
+                except discord.Forbidden:
+                    print(f"LỖI: Không thể gửi DM cho Admin (ID: {ADMIN_USER_ID}). Có thể Admin đã chặn bot hoặc tắt DM từ người lạ/server.")
+                except discord.HTTPException as e:
+                     print(f"LỖI: Lỗi mạng khi gửi DM cho Admin: {e}")
+                except Exception as e:
+                    print(f"Lỗi không xác định khi gửi DM: {e}")
 
         except Exception as e:
-            print(f"Lỗi trong quá trình xử lý AI/cảnh báo cho tin nhắn {message.id}: {e}")
+            print(f"Lỗi trong quá trình xử lý AI/DM cho tin nhắn {message.id}: {e}")
+
 
 
 # --- Hàm Chính để Chạy Bot ---
 async def main():
-    if not TOKEN:
-        print("LỖI: DISCORD_TOKEN chưa được đặt trong biến môi trường.")
-        return
-    if not DATABASE_URL:
-        print("LỖI: DATABASE_URL chưa được đặt. Bot sẽ chạy nhưng không ghi log DB.")
-
+    if not TOKEN: print("LỖI: DISCORD_TOKEN chưa được đặt."); return
+    if not ADMIN_USER_ID: print("CẢNH BÁO: ADMIN_USER_ID chưa được đặt, không thể gửi DM."); # Vẫn chạy
 
     async with client:
         try:
             await client.start(TOKEN)
-        except discord.errors.LoginFailure:
-            print("LỖI: Token Discord không hợp lệ.")
-        except discord.errors.PrivilegedIntentsRequired:
-             print("LỖI: Bot yêu cầu Privileged Gateway Intents (Message Content, Server Members). Vui lòng bật trong Discord Developer Portal.")
-        except Exception as e:
-            print(f"Lỗi nghiêm trọng khi chạy bot: {e}")
-
+        except discord.errors.LoginFailure: print("LỖI: Token Discord không hợp lệ.")
+        except discord.errors.PrivilegedIntentsRequired: print("LỖI: Bot yêu cầu Privileged Gateway Intents (Message Content).")
+        except Exception as e: print(f"Lỗi nghiêm trọng khi chạy bot: {e}")
         finally:
             print("Đang đóng kết nối database...")
-            await close_database() 
+            await close_database()
 
 if __name__ == "__main__":
     print("Đang khởi động bot...")
     try:
+
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\nĐã nhận tín hiệu dừng (Ctrl+C). Bot đang tắt...")

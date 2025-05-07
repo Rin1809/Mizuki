@@ -1,6 +1,6 @@
 
 .env
-
+moitruongao/
 # Thư mục log
 server_logs/
 *.log

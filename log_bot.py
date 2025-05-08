@@ -1,9 +1,7 @@
-# -*- coding: utf-8 -*-
 import discord
 import os
 from dotenv import load_dotenv
 import asyncio
-# import traceback # Bỏ comment nếu cần debug chi tiết lỗi
 
 # --- Tải biến môi trường ---
 load_dotenv()
@@ -12,7 +10,7 @@ ADMIN_USER_ID_STR = os.getenv('ADMIN_USER_ID', '873576591693873252') # ID Admin 
 
 # --- Cấu hình chính ---
 COMMAND_PREFIX = "!" # Prefix cho các lệnh của Mizuki (như !shiromi_cmd, !send)
-# Prefix mà Shiromi sử dụng (tham khảo cho admin, không dùng trong code gửi)
+
 SHIROMI_COMMAND_PREFIX_REFERENCE = "Shi" 
 
 # --- Chuyển đổi ID Admin ---
@@ -29,7 +27,6 @@ else:
 
 # --- Khởi tạo Bot Discord ---
 intents = discord.Intents.default()
-# Vẫn cần intents này để đọc DM, tìm kênh/user
 intents.messages = True
 intents.message_content = True # Bắt buộc để đọc nội dung DM
 intents.guilds = True          # Cần để tìm kênh trong server
@@ -38,7 +35,7 @@ intents.members = True         # Cần để fetch_user nếu admin không có t
 
 client = discord.Client(intents=intents)
 
-# --- Hàm Gửi DM An Toàn (Giữ lại để gửi phản hồi cho Admin) ---
+# --- Hàm Gửi DM An Toàn  ---
 async def send_dm_safe(user: discord.User | discord.DMChannel, content: str, context_log: str = "DM"):
     if not user:
         print(f"[DM CHECK][LỖI] Người nhận không hợp lệ ({context_log}).")
@@ -51,7 +48,7 @@ async def send_dm_safe(user: discord.User | discord.DMChannel, content: str, con
         if isinstance(user, discord.DMChannel):
             target_channel = user
             target_recipient_info = str(user.recipient) if user.recipient else "DM Kênh"
-        elif isinstance(user, (discord.User, discord.Member)): # Chấp nhận cả Member
+        elif isinstance(user, (discord.User, discord.Member)): 
             target_recipient_info = str(user)
             if not user.dm_channel:
                 print(f"[DM CHECK] Chưa có kênh DM cho {user}, đang tạo...")
@@ -84,7 +81,7 @@ async def send_dm_safe(user: discord.User | discord.DMChannel, content: str, con
         print(f"[DM CHECK][LỖI] Lỗi HTTP {e.status} khi gửi {context_log} tới {target_recipient_info}: {e.text}")
     except Exception as e:
         print(f"[DM CHECK][LỖI] Gửi {context_log} tới {target_recipient_info}: {e}")
-        # traceback.print_exc()
+
 
 # --- Hàm tìm kênh mục tiêu ---
 async def find_target_channel(specifier: str) -> discord.TextChannel | None:
@@ -100,7 +97,7 @@ async def find_target_channel(specifier: str) -> discord.TextChannel | None:
             target_channel = fetched_channel
         else:
             print(f"[KÊNH][LỖI] Kênh ID {channel_id} không phải là TextChannel ({type(fetched_channel)}).")
-            target_channel = None # Đảm bảo trả về None
+            target_channel = None 
 
     except ValueError: # Không phải ID, tìm bằng tên
         print(f"[KÊNH] Tìm kênh bằng tên: '{specifier}'")
@@ -128,7 +125,7 @@ async def find_target_channel(specifier: str) -> discord.TextChannel | None:
         print(f"[KÊNH][LỖI] Lỗi không mong muốn khi tìm kênh '{specifier}': {e}")
         target_channel = None
 
-    return target_channel # Trả về kênh tìm được hoặc None
+    return target_channel
 
 
 # --- Sự kiện Bot ---
@@ -145,7 +142,6 @@ async def on_ready():
 
 @client.event
 async def on_message(message: discord.Message):
-    # Chỉ xử lý tin nhắn DM từ Admin đã cấu hình
     if not isinstance(message.channel, discord.DMChannel) or message.author.id != ADMIN_USER_ID:
         return
 
@@ -155,7 +151,6 @@ async def on_message(message: discord.Message):
     if message.content.startswith(f"{COMMAND_PREFIX}shiromi_cmd"):
         print(f"[DM LỆNH SHIROMI] Admin {ADMIN_USER_ID} gửi lệnh: {message.content}")
         try:
-            # Tách lệnh: !shiromi_cmd <tên_kênh_hoặc_ID> <lệnh_cho_Shiromi_KHÔNG_CẦN_PREFIX>
             parts = message.content[len(COMMAND_PREFIX) + len("shiromi_cmd"):].strip().split(maxsplit=1)
             if len(parts) < 2:
                 await send_dm_safe(message.channel,
@@ -167,7 +162,7 @@ async def on_message(message: discord.Message):
                 return
 
             target_channel_specifier = parts[0]
-            shiromi_command_to_send = parts[1] # Đây là chuỗi lệnh Shiromi thực thi, vd "romi" hoặc "shiromirun ..."
+            shiromi_command_to_send = parts[1] 
 
             target_channel = await find_target_channel(target_channel_specifier)
 
@@ -217,10 +212,8 @@ async def on_message(message: discord.Message):
                 await send_dm_safe(message.channel, f"⚠️ Không tìm thấy kênh văn bản nào tên là `{target_channel_specifier}` hoặc bot không có quyền truy cập.", context_log="DM Send Raw Channel Not Found")
         except Exception as e:
             print(f"[LỖI DM LỆNH GỬI THÔ] Xử lý: {e}")
-            # traceback.print_exc()
             await send_dm_safe(message.channel, f"🙁 Đã có lỗi xảy ra khi xử lý lệnh gửi tin: {e}", context_log="DM Send Raw Unexpected Error")
 
-    # Bỏ qua các tin nhắn DM khác nếu không muốn làm gì thêm
 
 # --- Hàm chạy chính ---
 async def main():
@@ -239,10 +232,8 @@ async def main():
         except discord.errors.ConnectionClosed as e: print(f"[LỖI] Kết nối Discord bị đóng: Code {e.code}, Reason: {e.reason}")
         except Exception as e:
             print(f"[LỖI NGHIÊM TRỌNG] Khi chạy bot: {type(e).__name__}: {e}")
-            # traceback.print_exc()
         finally:
             print("[SYSTEM] Bot đang tắt...")
-            # Không cần close_database() nữa
             print("[SYSTEM] Bot đã tắt.")
 
 if __name__ == "__main__":
@@ -253,6 +244,5 @@ if __name__ == "__main__":
         print("\n--- Nhận tín hiệu dừng (Ctrl+C) ---")
     except Exception as e:
         print(f"\n[LỖI ASYNCIO/RUNTIME] Lỗi không mong muốn ở cấp cao nhất: {type(e).__name__}: {e}")
-        # traceback.print_exc()
     finally:
         print("--- Chương trình kết thúc ---")

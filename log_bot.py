@@ -3,25 +3,22 @@ import discord
 import os
 from dotenv import load_dotenv
 import asyncio
-import json # Để xử lý JSON từ request
-from datetime import datetime, timezone # Xử lý timestamp
-
+import json
+from datetime import datetime, timezone, timedelta 
 # Thư viện cho HTTP server
 from aiohttp import web
 
 # --- Tải biến môi trường ---
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
-ADMIN_USER_ID_STR = os.getenv('ADMIN_USER_ID', '873576591693873252') 
-# Port cho HTTP server của Mizuki, Railway sẽ inject PORT, đây là fallback
-MIZUKI_HTTP_PORT_STR = os.getenv('MIZUKI_HTTP_PORT', '8080') 
-# Secret key để xác thực request từ backend rin-personal-card
+ADMIN_USER_ID_STR = os.getenv('ADMIN_USER_ID', '873576591693873252')
+MIZUKI_HTTP_PORT_STR = os.getenv('MIZUKI_HTTP_PORT', os.getenv('PORT', '8080')) # Ưu tiên PORT từ Railway
 MIZUKI_EXPECTED_SECRET = os.getenv('MIZUKI_SHARED_SECRET', 'default_secret_key_for_mizuki')
 
 
 # --- Cấu hình chính ---
-COMMAND_PREFIX = "!" 
-SHIROMI_COMMAND_PREFIX_REFERENCE = "Shi" 
+COMMAND_PREFIX = "!"
+SHIROMI_COMMAND_PREFIX_REFERENCE = "Shi"
 
 # --- Chuyển đổi ID Admin & Port ---
 ADMIN_USER_ID = None
@@ -31,7 +28,7 @@ if ADMIN_USER_ID_STR:
         print(f"[CFG] ID Admin: {ADMIN_USER_ID}")
     except ValueError:
         print(f"[LỖI] ADMIN_USER_ID '{ADMIN_USER_ID_STR}' ko phải số.")
-        ADMIN_USER_ID = None 
+        ADMIN_USER_ID = None
 else:
     print("[LỖI] ADMIN_USER_ID chưa dc cfg.")
 
@@ -45,25 +42,23 @@ except ValueError:
 # --- Khởi tạo Bot Discord ---
 intents = discord.Intents.default()
 intents.messages = True
-intents.message_content = True 
-intents.guilds = True          
-intents.dm_messages = True     
-intents.members = True         
+intents.message_content = True
+intents.guilds = True
+intents.dm_messages = True
+intents.members = True
 
 client = discord.Client(intents=intents)
 
 # --- State cho AIOHTTP server ---
-http_runner = None # Sẽ dc init trong on_ready
+http_runner = None
 
-# --- Hàm Gửi DM An Toàn (giữ nguyên) ---
+# --- Hàm Gửi DM An Toàn (giữ nguyên từ phiên bản trước) ---
 async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = None, embed: discord.Embed = None, context_log: str = "DM"):
     if not user:
         print(f"[DM CHECK][LỖI] Người nhận ko hợp lệ ({context_log}).")
         return
-
     target_channel : discord.abc.Messageable = None
     target_recipient_info = "Ko xác định"
-
     try:
         if isinstance(user, discord.DMChannel):
             target_channel = user
@@ -82,13 +77,11 @@ async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = No
             print(f"[DM CHECK][LỖI] Ko thể xđ kênh DM tới {target_recipient_info} ({context_log}).")
             return
         
-        # Ưu tiên gửi embed nếu có
         if embed:
             await target_channel.send(embed=embed)
             print(f"[DM CHECK] Gửi EMBED {context_log} tới {target_recipient_info} thành công.")
-            return # Kết thúc sớm nếu đã gửi embed
+            return 
 
-        # Gửi content text nếu ko có embed hoặc embed=None
         if content:
             if len(content) <= 2000:
                 await target_channel.send(content)
@@ -109,7 +102,7 @@ async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = No
         print(f"[DM CHECK][LỖI] Gửi {context_log}: {e}")
 
 
-# --- Hàm tìm kênh mục tiêu (giữ nguyên) ---
+# --- Hàm tìm kênh mục tiêu (giữ nguyên từ phiên bản trước) ---
 async def find_target_channel(specifier: str) -> discord.TextChannel | None:
     target_channel = None
     try: 
@@ -135,17 +128,15 @@ async def find_target_channel(specifier: str) -> discord.TextChannel | None:
     except Exception: target_channel = None
     return target_channel
 
-
 # --- HTTP Handler cho thông báo truy cập ---
 async def handle_notify_visit(request: web.Request):
-    # Ktra secret key
     received_secret = request.headers.get("X-Mizuki-Secret")
     if MIZUKI_EXPECTED_SECRET and received_secret != MIZUKI_EXPECTED_SECRET:
         print("[HTTP NOTIFY][LỖI] Sai secret key. Bỏ qua.")
         return web.Response(text="Forbidden: Invalid secret", status=403)
 
     try:
-        data = await request.json() # Lấy data JSON từ request
+        data = await request.json()
         ip = data.get("ip", "N/A")
         location = data.get("location", "Không rõ")
         country = data.get("country", "N/A")
@@ -153,26 +144,34 @@ async def handle_notify_visit(request: web.Request):
         region = data.get("region", "N/A")
         isp = data.get("isp", "N/A")
         user_agent = data.get("userAgent", "N/A")
-        timestamp_iso = data.get("timestamp", datetime.now(timezone.utc).isoformat())
+        timestamp_iso_utc = data.get("timestamp", datetime.now(timezone.utc).isoformat())
 
-        # Chuyển ISO string thành datetime object (UTC)
+        # Chuyển ISO string (mặc định là UTC từ server) sang datetime object UTC
         try:
-            dt_object = datetime.fromisoformat(timestamp_iso.replace('Z', '+00:00'))
-        except ValueError: # Nếu parse lỗi, dùng tgian hiện tại
-            dt_object = datetime.now(timezone.utc)
+            dt_object_utc = datetime.fromisoformat(timestamp_iso_utc.replace('Z', '+00:00'))
+        except ValueError: # Nếu parse lỗi, dùng tgian hiện tại UTC
+            dt_object_utc = datetime.now(timezone.utc)
         
-        # Format thời gian hiển thị (vd: 14:30:05 25/12/2023 UTC)
-        timestamp_formatted = dt_object.strftime('%H:%M:%S %d/%m/%Y UTC')
+        # Tạo timezone cho UTC+7 (TP.HCM)
+        hcm_tz = timezone(timedelta(hours=7))
+        # Chuyển datetime object từ UTC sang UTC+7
+        dt_object_hcm = dt_object_utc.astimezone(hcm_tz)
+        
+        # Format thời gian hiển thị theo múi giờ UTC+7
+        timestamp_formatted_hcm = dt_object_hcm.strftime('%H:%M:%S %d/%m/%Y (GMT+7)')
 
         admin_user = await client.fetch_user(ADMIN_USER_ID)
         if admin_user:
             embed = discord.Embed(
                 title="🌐 Có lượt truy cập website!",
-                color=discord.Color.from_rgb(137, 180, 250), # Màu xanh info
-                timestamp=dt_object # discord.py tự xử lý timezone cho embed timestamp
+                color=discord.Color.from_rgb(137, 180, 250), 
+                # timestamp của embed vẫn nên là UTC, Discord client sẽ tự hiển thị theo local của người xem
+                # Hoặc bạn có thể đặt là dt_object_hcm nếu muốn timestamp của embed cố định là giờ HCM
+                timestamp=dt_object_utc 
             )
             embed.add_field(name="👤 IP", value=f"`{ip}`", inline=True)
-            embed.add_field(name="⏰ Thời gian", value=timestamp_formatted, inline=True)
+            # Hiển thị thời gian đã chuyển đổi sang UTC+7
+            embed.add_field(name="⏰ Thời gian (VN)", value=timestamp_formatted_hcm, inline=True) 
             embed.add_field(name="📍 Vị trí ước tính", value=location, inline=False)
             embed.add_field(name="🌍 Quốc gia", value=country, inline=True)
             embed.add_field(name="🏙️ TP/Vùng", value=f"{city} / {region}", inline=True)
@@ -181,7 +180,7 @@ async def handle_notify_visit(request: web.Request):
             embed.set_footer(text="rin-personal-card | visit notification")
 
             await send_dm_safe(admin_user, embed=embed, context_log="Visit Notify")
-            print(f"[HTTP NOTIFY] Đã gửi tbáo visit cho Admin: IP {ip}")
+            print(f"[HTTP NOTIFY] Đã gửi tbáo visit cho Admin: IP {ip}, Time (HCM): {timestamp_formatted_hcm}")
         else:
             print(f"[HTTP NOTIFY][LỖI] Ko tìm thấy Admin User ID: {ADMIN_USER_ID}")
 
@@ -193,24 +192,22 @@ async def handle_notify_visit(request: web.Request):
         print(f"[HTTP NOTIFY][LỖI] Xử lý tbáo visit: {e}")
         return web.Response(text=f"Internal Server Error: {e}", status=500)
 
-# --- Hàm khởi tạo HTTP server ---
+# --- Hàm khởi tạo HTTP server (giữ nguyên từ phiên bản trước) ---
 async def setup_http_server():
-    global http_runner # Để có thể cleanup sau
+    global http_runner 
     app = web.Application()
-    # Endpoint Mizuki lắng nghe từ web backend
     app.router.add_post('/notify-visit', handle_notify_visit) 
 
     http_runner = web.AppRunner(app)
     await http_runner.setup()
-    # Railway sẽ inject biến PORT, nếu ko thì dùng MIZUKI_HTTP_PORT
-    # Listen trên 0.0.0.0 để Railway/container có thể map port
-    effective_port = int(os.getenv('PORT', MIZUKI_HTTP_PORT))
+    
+    effective_port = int(os.getenv('PORT', MIZUKI_HTTP_PORT_STR))
+    
     site = web.TCPSite(http_runner, '0.0.0.0', effective_port)
     await site.start()
     print(f"🌍 Mizuki HTTP server đang lắng nghe trên port {effective_port}...")
 
-
-# --- Sự kiện Bot ---
+# --- Sự kiện Bot (giữ nguyên on_ready, on_message) ---
 @client.event
 async def on_ready():
     print(f'>>> Đã đăng nhập: {client.user.name} ({client.user.id}) <<<')
@@ -221,17 +218,15 @@ async def on_ready():
         print(">>> LỖI NGHIÊM TRỌNG: ADMIN_USER_ID KO HỢP LỆ! Bot sẽ ko h.động. <<<")
     else:
         print(">>> Bot đã sẵn sàng nhận lệnh DM từ Admin! <<<")
-        # Khởi động HTTP server sau khi bot discord đã ready
         await setup_http_server()
 
 @client.event
 async def on_message(message: discord.Message):
     if not isinstance(message.channel, discord.DMChannel) or message.author.id != ADMIN_USER_ID:
-        return # Chỉ xử lý DM từ Admin
+        return 
 
     print(f"[DM NHẬN] Từ Admin ({ADMIN_USER_ID}): {message.content[:100]}...")
 
-    # --- Lệnh Relay cho Shiromi (giữ nguyên) ---
     if message.content.startswith(f"{COMMAND_PREFIX}shiromi_cmd"):
         print(f"[DM LỆNH SHIROMI] Admin {ADMIN_USER_ID} gửi: {message.content}")
         try:
@@ -265,7 +260,6 @@ async def on_message(message: discord.Message):
             print(f"[LỖI DM LỆNH SHIROMI] Xử lý: {e}")
             await send_dm_safe(message.channel, f"🙁 Lỗi xử lý lệnh Shiromi: {e}", context_log="DM Shiromi Cmd Unexpected Err")
 
-    # --- Lệnh gửi tin nhắn thô (giữ nguyên) ---
     elif message.content.startswith(COMMAND_PREFIX):
         print(f"[DM LỆNH GỬI THÔ] Admin {ADMIN_USER_ID} gửi: {message.content}")
         try:
@@ -293,8 +287,7 @@ async def on_message(message: discord.Message):
             print(f"[LỖI DM LỆNH GỬI THÔ] Xử lý: {e}")
             await send_dm_safe(message.channel, f"🙁 Lỗi khi gửi tin: {e}", context_log="DM Send Raw Unexpected Err")
 
-
-# --- Hàm chạy chính ---
+# --- Hàm chạy chính (giữ nguyên từ phiên bản trước) ---
 async def main():
     if not TOKEN:
         print("[LỖI] Thiếu DISCORD_TOKEN.")
@@ -303,12 +296,11 @@ async def main():
         print("[LỖI] ADMIN_USER_ID ko hợp lệ. Bot ko thể h.động.")
         return
 
-    # Chạy client.start() như một task nền để ko block HTTP server
-    # http_server đã dc start trong on_ready
+    # Chạy client.start() như một task nền
     discord_client_task = asyncio.create_task(client.start(TOKEN))
     
     try:
-        await discord_client_task # Giữ cho main() chạy và chờ client hoàn thành
+        await discord_client_task 
     except discord.errors.LoginFailure: print("[LỖI] Token Discord ko hợp lệ.")
     except discord.errors.PrivilegedIntentsRequired: print("[LỖI] Thiếu quyền Privileged Intents.")
     except discord.errors.ConnectionClosed as e: print(f"[LỖI] Kết nối Discord bị đóng: Code {e.code}, Reason: {e.reason}")
@@ -316,10 +308,10 @@ async def main():
         print(f"[LỖI NGHIÊM TRỌNG] Khi chạy bot: {type(e).__name__}: {e}")
     finally:
         print("[H.THỐNG] Bot đang tắt...")
-        if http_runner: # Nếu http_runner đã dc tạo
-            await http_runner.cleanup() # Dọn dẹp AIOHTTP server
+        if http_runner: 
+            await http_runner.cleanup() 
             print("[HTTP] Server đã tắt.")
-        if not client.is_closed():
+        if client and not client.is_closed(): 
             await client.close()
         print("[H.THỐNG] Bot đã tắt.")
 

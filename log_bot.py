@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 import asyncio
 import json
 from datetime import datetime, timezone, timedelta 
-# Thư viện cho HTTP server
 from aiohttp import web
 
 # --- Tải biến môi trường ---
@@ -52,7 +51,7 @@ client = discord.Client(intents=intents)
 # --- State cho AIOHTTP server ---
 http_runner = None
 
-# --- Hàm Gửi DM An Toàn (giữ nguyên từ phiên bản trước) ---
+# --- Hàm Gửi DM An Toàn ---
 async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = None, embed: discord.Embed = None, context_log: str = "DM"):
     if not user:
         print(f"[DM CHECK][LỖI] Người nhận ko hợp lệ ({context_log}).")
@@ -102,7 +101,7 @@ async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = No
         print(f"[DM CHECK][LỖI] Gửi {context_log}: {e}")
 
 
-# --- Hàm tìm kênh mục tiêu (giữ nguyên từ phiên bản trước) ---
+# --- Hàm tìm kênh mục tiêu ---
 async def find_target_channel(specifier: str) -> discord.TextChannel | None:
     target_channel = None
     try: 
@@ -166,7 +165,7 @@ async def handle_notify_visit(request: web.Request):
                 title="🌐 Có lượt truy cập website!",
                 color=discord.Color.from_rgb(137, 180, 250), 
                 # timestamp của embed vẫn nên là UTC, Discord client sẽ tự hiển thị theo local của người xem
-                # Hoặc bạn có thể đặt là dt_object_hcm nếu muốn timestamp của embed cố định là giờ HCM
+                # Hoặc có thể đặt là dt_object_hcm nếu muốn timestamp của embed cố định là giờ HCM
                 timestamp=dt_object_utc 
             )
             embed.add_field(name="👤 IP", value=f"`{ip}`", inline=True)
@@ -192,7 +191,7 @@ async def handle_notify_visit(request: web.Request):
         print(f"[HTTP NOTIFY][LỖI] Xử lý tbáo visit: {e}")
         return web.Response(text=f"Internal Server Error: {e}", status=500)
 
-# --- Hàm khởi tạo HTTP server (giữ nguyên từ phiên bản trước) ---
+# --- Hàm khởi tạo HTTP server  ---
 async def setup_http_server():
     global http_runner 
     app = web.Application()
@@ -207,7 +206,7 @@ async def setup_http_server():
     await site.start()
     print(f"🌍 Mizuki HTTP server đang lắng nghe trên port {effective_port}...")
 
-# --- Sự kiện Bot (giữ nguyên on_ready, on_message) ---
+# --- Sự kiện Bot  ---
 @client.event
 async def on_ready():
     print(f'>>> Đã đăng nhập: {client.user.name} ({client.user.id}) <<<')
@@ -287,7 +286,7 @@ async def on_message(message: discord.Message):
             print(f"[LỖI DM LỆNH GỬI THÔ] Xử lý: {e}")
             await send_dm_safe(message.channel, f"🙁 Lỗi khi gửi tin: {e}", context_log="DM Send Raw Unexpected Err")
 
-# --- Hàm chạy chính (giữ nguyên từ phiên bản trước) ---
+# --- Hàm chạy chính ---
 async def main():
     if not TOKEN:
         print("[LỖI] Thiếu DISCORD_TOKEN.")

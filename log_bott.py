@@ -1,3 +1,4 @@
+
 # Mizuki/log_bot.py
 import discord
 import os
@@ -16,7 +17,7 @@ MIZUKI_HTTP_PORT_STR = os.getenv('MIZUKI_HTTP_PORT', os.getenv('PORT', '8080')) 
 MIZUKI_EXPECTED_SECRET = os.getenv('MIZUKI_SHARED_SECRET', 'default_secret_key_for_mizuki')
 
 # --- DANH SÁCH IP NGOẠI LỆ ---
-EXCLUDED_IPS = ["171.250.164.44"] # Thêm IP muốn ngoại lệ vào đây
+EXCLUDED_IPS = ["171.250.164.44"] # Thêm IP bạn muốn ngoại lệ vào đây
 
 # --- Cấu hình chính ---
 COMMAND_PREFIX = "!"

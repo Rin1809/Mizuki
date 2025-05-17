@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 import asyncio
 import json
-from datetime import datetime, timezone, timedelta 
+from datetime import datetime, timezone, timedelta
 # Thư viện cho HTTP server
 from aiohttp import web
 
@@ -15,6 +15,8 @@ ADMIN_USER_ID_STR = os.getenv('ADMIN_USER_ID', '873576591693873252')
 MIZUKI_HTTP_PORT_STR = os.getenv('MIZUKI_HTTP_PORT', os.getenv('PORT', '8080')) # Ưu tiên PORT từ Railway
 MIZUKI_EXPECTED_SECRET = os.getenv('MIZUKI_SHARED_SECRET', 'default_secret_key_for_mizuki')
 
+# --- DANH SÁCH IP NGOẠI LỆ ---
+EXCLUDED_IPS = ["171.250.164.44"] # Thêm IP muốn ngoại lệ vào đây
 
 # --- Cấu hình chính ---
 COMMAND_PREFIX = "!"
@@ -63,7 +65,7 @@ async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = No
         if isinstance(user, discord.DMChannel):
             target_channel = user
             target_recipient_info = str(user.recipient) if user.recipient else "DM Kênh"
-        elif isinstance(user, (discord.User, discord.Member)): 
+        elif isinstance(user, (discord.User, discord.Member)):
             target_recipient_info = str(user)
             if not user.dm_channel:
                 target_channel = await user.create_dm()
@@ -80,12 +82,12 @@ async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = No
         if embed:
             await target_channel.send(embed=embed)
             print(f"[DM CHECK] Gửi EMBED {context_log} tới {target_recipient_info} thành công.")
-            return 
+            return
 
         if content:
             if len(content) <= 2000:
                 await target_channel.send(content)
-            else: 
+            else:
                 chunks = [content[i:i + 1990] for i in range(0, len(content), 1990)]
                 for i, chunk in enumerate(chunks):
                     await target_channel.send(f"**(Phần {i+1}/{len(chunks)})**\n{chunk}")
@@ -105,7 +107,7 @@ async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = No
 # --- Hàm tìm kênh mục tiêu (giữ nguyên từ phiên bản trước) ---
 async def find_target_channel(specifier: str) -> discord.TextChannel | None:
     target_channel = None
-    try: 
+    try:
         channel_id = int(specifier)
         fetched_channel = client.get_channel(channel_id)
         if not fetched_channel:
@@ -113,8 +115,8 @@ async def find_target_channel(specifier: str) -> discord.TextChannel | None:
         if isinstance(fetched_channel, discord.TextChannel):
             target_channel = fetched_channel
         else:
-            target_channel = None 
-    except ValueError: 
+            target_channel = None
+    except ValueError:
         found = False
         for guild in client.guilds:
             for channel_in_guild in guild.text_channels:
@@ -138,6 +140,15 @@ async def handle_notify_visit(request: web.Request):
     try:
         data = await request.json()
         ip = data.get("ip", "N/A")
+
+        # --- KIỂM TRA IP NGOẠI LỆ ---
+        if ip in EXCLUDED_IPS:
+            print(f"[HTTP NOTIFY][INFO] Lượt truy cập từ IP ngoại lệ ({ip}). Bỏ qua thông báo DM.")
+            # Vẫn log thông tin truy cập nếu cần thiết (ví dụ: ghi vào file log riêng)
+            # log_excluded_visit(ip, data.get("location"), data.get("userAgent")) 
+            return web.Response(text="Visit from excluded IP, notification skipped.", status=200)
+        # --- KẾT THÚC KIỂM TRA IP NGOẠI LỆ ---
+
         location = data.get("location", "Không rõ")
         country = data.get("country", "N/A")
         city = data.get("city", "N/A")
@@ -164,14 +175,11 @@ async def handle_notify_visit(request: web.Request):
         if admin_user:
             embed = discord.Embed(
                 title="🌐 Có lượt truy cập website!",
-                color=discord.Color.from_rgb(137, 180, 250), 
-                # timestamp của embed vẫn nên là UTC, Discord client sẽ tự hiển thị theo local của người xem
-                # Hoặc bạn có thể đặt là dt_object_hcm nếu muốn timestamp của embed cố định là giờ HCM
-                timestamp=dt_object_utc 
+                color=discord.Color.from_rgb(137, 180, 250),
+                timestamp=dt_object_utc
             )
             embed.add_field(name="👤 IP", value=f"`{ip}`", inline=True)
-            # Hiển thị thời gian đã chuyển đổi sang UTC+7
-            embed.add_field(name="⏰ Thời gian (VN)", value=timestamp_formatted_hcm, inline=True) 
+            embed.add_field(name="⏰ Thời gian (VN)", value=timestamp_formatted_hcm, inline=True)
             embed.add_field(name="📍 Vị trí ước tính", value=location, inline=False)
             embed.add_field(name="🌍 Quốc gia", value=country, inline=True)
             embed.add_field(name="🏙️ TP/Vùng", value=f"{city} / {region}", inline=True)
@@ -194,9 +202,9 @@ async def handle_notify_visit(request: web.Request):
 
 # --- Hàm khởi tạo HTTP server (giữ nguyên từ phiên bản trước) ---
 async def setup_http_server():
-    global http_runner 
+    global http_runner
     app = web.Application()
-    app.router.add_post('/notify-visit', handle_notify_visit) 
+    app.router.add_post('/notify-visit', handle_notify_visit)
 
     http_runner = web.AppRunner(app)
     await http_runner.setup()
@@ -223,7 +231,7 @@ async def on_ready():
 @client.event
 async def on_message(message: discord.Message):
     if not isinstance(message.channel, discord.DMChannel) or message.author.id != ADMIN_USER_ID:
-        return 
+        return
 
     print(f"[DM NHẬN] Từ Admin ({ADMIN_USER_ID}): {message.content[:100]}...")
 
@@ -240,7 +248,7 @@ async def on_message(message: discord.Message):
                 return
 
             target_channel_specifier = parts[0]
-            shiromi_command_to_send = parts[1] 
+            shiromi_command_to_send = parts[1]
 
             target_channel = await find_target_channel(target_channel_specifier)
 
@@ -300,7 +308,7 @@ async def main():
     discord_client_task = asyncio.create_task(client.start(TOKEN))
     
     try:
-        await discord_client_task 
+        await discord_client_task
     except discord.errors.LoginFailure: print("[LỖI] Token Discord ko hợp lệ.")
     except discord.errors.PrivilegedIntentsRequired: print("[LỖI] Thiếu quyền Privileged Intents.")
     except discord.errors.ConnectionClosed as e: print(f"[LỖI] Kết nối Discord bị đóng: Code {e.code}, Reason: {e.reason}")
@@ -308,10 +316,10 @@ async def main():
         print(f"[LỖI NGHIÊM TRỌNG] Khi chạy bot: {type(e).__name__}: {e}")
     finally:
         print("[H.THỐNG] Bot đang tắt...")
-        if http_runner: 
-            await http_runner.cleanup() 
+        if http_runner:
+            await http_runner.cleanup()
             print("[HTTP] Server đã tắt.")
-        if client and not client.is_closed(): 
+        if client and not client.is_closed():
             await client.close()
         print("[H.THỐNG] Bot đã tắt.")
 

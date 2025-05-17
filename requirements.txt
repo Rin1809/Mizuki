@@ -3,3 +3,4 @@ dotenv
 python-dotenv
 psycopg2-binary
 google-generativeai
+aiohttp

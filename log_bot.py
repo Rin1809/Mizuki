@@ -5,43 +5,40 @@ from dotenv import load_dotenv
 import asyncio
 import json
 from datetime import datetime, timezone, timedelta
-# Thư viện cho HTTP server
 from aiohttp import web
 
-# --- Tải biến môi trường ---
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 ADMIN_USER_ID_STR = os.getenv('ADMIN_USER_ID', '873576591693873252')
-MIZUKI_HTTP_PORT_STR = os.getenv('MIZUKI_HTTP_PORT', os.getenv('PORT', '8080')) # Ưu tiên PORT từ Railway
+MIZUKI_HTTP_PORT_STR = os.getenv('MIZUKI_HTTP_PORT', os.getenv('PORT', '8080')) 
 MIZUKI_EXPECTED_SECRET = os.getenv('MIZUKI_SHARED_SECRET', 'default_secret_key_for_mizuki')
 
-# --- DANH SÁCH IP NGOẠI LỆ ---
-EXCLUDED_IPS = ["171.250.164.44"] # Thêm IP bạn muốn ngoại lệ vào đây
+EXCLUDED_IPS_RAW = os.getenv('EXCLUDED_IPS', "") 
+EXCLUDED_IPS = [ip.strip() for ip in EXCLUDED_IPS_RAW.split(',') if ip.strip()]
+if EXCLUDED_IPS:
+    print(f"[CFG] IP Ngoai le (ko DM): {EXCLUDED_IPS}")
 
-# --- Cấu hình chính ---
+
 COMMAND_PREFIX = "!"
 SHIROMI_COMMAND_PREFIX_REFERENCE = "Shi"
 
-# --- Chuyển đổi ID Admin & Port ---
 ADMIN_USER_ID = None
 if ADMIN_USER_ID_STR:
     try:
         ADMIN_USER_ID = int(ADMIN_USER_ID_STR)
         print(f"[CFG] ID Admin: {ADMIN_USER_ID}")
     except ValueError:
-        print(f"[LỖI] ADMIN_USER_ID '{ADMIN_USER_ID_STR}' ko phải số.")
+        print(f"[LỖI] ADMIN_USER_ID '{ADMIN_USER_ID_STR}' ko phai so.")
         ADMIN_USER_ID = None
 else:
-    print("[LỖI] ADMIN_USER_ID chưa dc cfg.")
+    print("[LỖI] ADMIN_USER_ID chua dc cfg.")
 
-MIZUKI_HTTP_PORT = 8080 # Port mặc định
+MIZUKI_HTTP_PORT = 8080 
 try:
     MIZUKI_HTTP_PORT = int(MIZUKI_HTTP_PORT_STR)
 except ValueError:
-    print(f"[LỖI] MIZUKI_HTTP_PORT '{MIZUKI_HTTP_PORT_STR}' ko hợp lệ. Dùng port mặc định: {MIZUKI_HTTP_PORT}")
+    print(f"[LỖI] MIZUKI_HTTP_PORT '{MIZUKI_HTTP_PORT_STR}' ko hop le. Dung port mac dinh: {MIZUKI_HTTP_PORT}")
 
-
-# --- Khởi tạo Bot Discord ---
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
@@ -50,21 +47,18 @@ intents.dm_messages = True
 intents.members = True
 
 client = discord.Client(intents=intents)
-
-# --- State cho AIOHTTP server ---
 http_runner = None
 
-# --- Hàm Gửi DM An Toàn (giữ nguyên từ phiên bản trước) ---
 async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = None, embed: discord.Embed = None, context_log: str = "DM"):
     if not user:
-        print(f"[DM CHECK][LỖI] Người nhận ko hợp lệ ({context_log}).")
+        print(f"[DM CHECK][LỖI] Nguoi nhan ko hop le ({context_log}).")
         return
     target_channel : discord.abc.Messageable = None
-    target_recipient_info = "Ko xác định"
+    target_recipient_info = "Ko xac dinh"
     try:
         if isinstance(user, discord.DMChannel):
             target_channel = user
-            target_recipient_info = str(user.recipient) if user.recipient else "DM Kênh"
+            target_recipient_info = str(user.recipient) if user.recipient else "DM Kenh"
         elif isinstance(user, (discord.User, discord.Member)):
             target_recipient_info = str(user)
             if not user.dm_channel:
@@ -72,16 +66,16 @@ async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = No
             else:
                 target_channel = user.dm_channel
         else:
-            print(f"[DM CHECK][LỖI] Loại người nhận ko xđ: {type(user)}")
+            print(f"[DM CHECK][LỖI] Loai nguoi nhan ko xd: {type(user)}")
             return
 
         if not target_channel:
-            print(f"[DM CHECK][LỖI] Ko thể xđ kênh DM tới {target_recipient_info} ({context_log}).")
+            print(f"[DM CHECK][LỖI] Ko the xd kenh DM toi {target_recipient_info} ({context_log}).")
             return
-
+        
         if embed:
             await target_channel.send(embed=embed)
-            print(f"[DM CHECK] Gửi EMBED {context_log} tới {target_recipient_info} thành công.")
+            # print(f"[DM CHECK] Gui EMBED {context_log} toi {target_recipient_info} thanh cong.") # comment out
             return
 
         if content:
@@ -90,21 +84,20 @@ async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = No
             else:
                 chunks = [content[i:i + 1990] for i in range(0, len(content), 1990)]
                 for i, chunk in enumerate(chunks):
-                    await target_channel.send(f"**(Phần {i+1}/{len(chunks)})**\n{chunk}")
+                    await target_channel.send(f"**(Phan {i+1}/{len(chunks)})**\n{chunk}")
                     await asyncio.sleep(0.6)
-            print(f"[DM CHECK] Gửi TEXT {context_log} tới {target_recipient_info} thành công.")
+            # print(f"[DM CHECK] Gui TEXT {context_log} toi {target_recipient_info} thanh cong.") # comment out
         else:
-            print(f"[DM CHECK][LỖI] Ko có content hoặc embed để gửi {context_log} tới {target_recipient_info}.")
+            print(f"[DM CHECK][LỖI] Ko co content/embed de gui {context_log} toi {target_recipient_info}.")
 
     except discord.Forbidden:
-        print(f"[DM CHECK][LỖI] Ko có quyền gửi {context_log} tới {target_recipient_info}.")
+        print(f"[DM CHECK][LỖI] Ko co quyen gui {context_log} toi {target_recipient_info}.")
     except discord.HTTPException as e:
-        print(f"[DM CHECK][LỖI] Lỗi HTTP {e.status} khi gửi {context_log}: {e.text}")
+        print(f"[DM CHECK][LỖI] Loi HTTP {e.status} khi gui {context_log}: {e.text}")
     except Exception as e:
-        print(f"[DM CHECK][LỖI] Gửi {context_log}: {e}")
+        print(f"[DM CHECK][LỖI] Gui {context_log}: {e}")
 
 
-# --- Hàm tìm kênh mục tiêu (giữ nguyên từ phiên bản trước) ---
 async def find_target_channel(specifier: str) -> discord.TextChannel | None:
     target_channel = None
     try:
@@ -130,24 +123,27 @@ async def find_target_channel(specifier: str) -> discord.TextChannel | None:
     except Exception: target_channel = None
     return target_channel
 
-# --- HTTP Handler cho thông báo truy cập ---
+def format_timestamp_hcm(timestamp_iso_utc_str: str) -> str:
+    try:
+        dt_object_utc = datetime.fromisoformat(timestamp_iso_utc_str.replace('Z', '+00:00'))
+    except ValueError:
+        dt_object_utc = datetime.now(timezone.utc) 
+    hcm_tz = timezone(timedelta(hours=7))
+    dt_object_hcm = dt_object_utc.astimezone(hcm_tz)
+    return dt_object_hcm.strftime('%H:%M:%S %d/%m/%Y (GMT+7)')
+
 async def handle_notify_visit(request: web.Request):
     received_secret = request.headers.get("X-Mizuki-Secret")
     if MIZUKI_EXPECTED_SECRET and received_secret != MIZUKI_EXPECTED_SECRET:
-        print("[HTTP NOTIFY][LỖI] Sai secret key. Bỏ qua.")
+        # print("[HTTP NOTIFY VISIT][LỖI] Sai secret key. Bo qua.") # comment out
         return web.Response(text="Forbidden: Invalid secret", status=403)
-
     try:
         data = await request.json()
         ip = data.get("ip", "N/A")
 
-        # --- KIỂM TRA IP NGOẠI LỆ ---
         if ip in EXCLUDED_IPS:
-            print(f"[HTTP NOTIFY][INFO] Lượt truy cập từ IP ngoại lệ ({ip}). Bỏ qua thông báo DM.")
-            # Vẫn log thông tin truy cập nếu cần thiết (ví dụ: ghi vào file log riêng)
-            # log_excluded_visit(ip, data.get("location"), data.get("userAgent")) 
+            # print(f"[HTTP NOTIFY VISIT][INFO] Luot truy cap tu IP ngoai le ({ip}). Bo qua DM.") # comment out
             return web.Response(text="Visit from excluded IP, notification skipped.", status=200)
-        # --- KẾT THÚC KIỂM TRA IP NGOẠI LỆ ---
 
         location = data.get("location", "Không rõ")
         country = data.get("country", "N/A")
@@ -156,76 +152,149 @@ async def handle_notify_visit(request: web.Request):
         isp = data.get("isp", "N/A")
         user_agent = data.get("userAgent", "N/A")
         timestamp_iso_utc = data.get("timestamp", datetime.now(timezone.utc).isoformat())
-
-        # Chuyển ISO string (mặc định là UTC từ server) sang datetime object UTC
-        try:
-            dt_object_utc = datetime.fromisoformat(timestamp_iso_utc.replace('Z', '+00:00'))
-        except ValueError: # Nếu parse lỗi, dùng tgian hiện tại UTC
-            dt_object_utc = datetime.now(timezone.utc)
-
-        # Tạo timezone cho UTC+7 (TP.HCM)
-        hcm_tz = timezone(timedelta(hours=7))
-        # Chuyển datetime object từ UTC sang UTC+7
-        dt_object_hcm = dt_object_utc.astimezone(hcm_tz)
-
-        # Format thời gian hiển thị theo múi giờ UTC+7
-        timestamp_formatted_hcm = dt_object_hcm.strftime('%H:%M:%S %d/%m/%Y (GMT+7)')
-
+        timestamp_formatted_hcm = format_timestamp_hcm(timestamp_iso_utc)
+        
         admin_user = await client.fetch_user(ADMIN_USER_ID)
         if admin_user:
             embed = discord.Embed(
                 title="🌐 Có lượt truy cập website!",
-                color=discord.Color.from_rgb(137, 180, 250),
-                timestamp=dt_object_utc
+                color=discord.Color.from_rgb(137, 180, 250), 
+                timestamp=datetime.fromisoformat(timestamp_iso_utc.replace('Z', '+00:00'))
             )
             embed.add_field(name="👤 IP", value=f"`{ip}`", inline=True)
             embed.add_field(name="⏰ Thời gian (VN)", value=timestamp_formatted_hcm, inline=True)
-            embed.add_field(name="📍 Vị trí ước tính", value=location, inline=False)
-            embed.add_field(name="🌍 Quốc gia", value=country, inline=True)
-            embed.add_field(name="🏙️ TP/Vùng", value=f"{city} / {region}", inline=True)
-            embed.add_field(name="📡 ISP", value=isp, inline=True)
+            embed.add_field(name="📍 Vị trí", value=location, inline=False)
+            if country != "N/A": embed.add_field(name="🌍 Quốc gia", value=country, inline=True)
+            if city != "N/A" or region != "N/A": embed.add_field(name="🏙️ TP/Vùng", value=f"{city} / {region}", inline=True)
+            if isp != "N/A": embed.add_field(name="📡 ISP", value=isp, inline=True)
             embed.add_field(name="🖥️ Thiết bị", value=f"```{user_agent}```", inline=False)
             embed.set_footer(text="rin-personal-card | visit notification")
 
             await send_dm_safe(admin_user, embed=embed, context_log="Visit Notify")
-            print(f"[HTTP NOTIFY] Đã gửi tbáo visit cho Admin: IP {ip}, Time (HCM): {timestamp_formatted_hcm}")
+            # print(f"[HTTP NOTIFY VISIT] Da gui tbao visit cho Admin: IP {ip}") # comment out
         else:
-            print(f"[HTTP NOTIFY][LỖI] Ko tìm thấy Admin User ID: {ADMIN_USER_ID}")
-
+            print(f"[HTTP NOTIFY VISIT][LỖI] Ko tim thay Admin User ID: {ADMIN_USER_ID}")
         return web.Response(text="Notification received by Mizuki.", status=200)
-    except json.JSONDecodeError:
-        print("[HTTP NOTIFY][LỖI] Dữ liệu POST ko phải JSON.")
+    except json.JSONDecodeError: 
+        print("[HTTP NOTIFY VISIT][LỖI] Du lieu POST ko phai JSON.")
         return web.Response(text="Bad Request: Invalid JSON", status=400)
     except Exception as e:
-        print(f"[HTTP NOTIFY][LỖI] Xử lý tbáo visit: {e}")
+        print(f"[HTTP NOTIFY VISIT][LỖI] Xu ly tbao visit: {e}")
         return web.Response(text=f"Internal Server Error: {e}", status=500)
 
-# --- Hàm khởi tạo HTTP server (giữ nguyên từ phiên bản trước) ---
+# HANDLER MOI CHO LOG INTERACTION
+async def handle_log_interaction(request: web.Request):
+    received_secret = request.headers.get("X-Mizuki-Secret")
+    if MIZUKI_EXPECTED_SECRET and received_secret != MIZUKI_EXPECTED_SECRET:
+        # print("[HTTP INTERACTION LOG][LỖI] Sai secret key. Bo qua.") # comment out
+        return web.Response(text="Forbidden: Invalid secret", status=403)
+
+    try:
+        data = await request.json()
+        ip = data.get("ip", "N/A")
+
+        if ip in EXCLUDED_IPS:
+            # print(f"[HTTP INTERACTION LOG][INFO] Log tu IP ngoai le ({ip}). Bo qua DM.") # comment out
+            return web.Response(text="Interaction from excluded IP, DM skipped.", status=200)
+            
+        location = data.get("location", "Không rõ")
+        user_agent = data.get("userAgent", "N/A")
+        client_timestamp_iso_utc = data.get("clientTimestamp", datetime.now(timezone.utc).isoformat())
+        server_timestamp_iso_utc = data.get("serverTimestamp", datetime.now(timezone.utc).isoformat())
+        
+        event_type = data.get("eventType", "unknown_interaction")
+        event_data = data.get("eventData", {})
+
+        client_time_hcm = format_timestamp_hcm(client_timestamp_iso_utc)
+        
+        admin_user = await client.fetch_user(ADMIN_USER_ID)
+        if not admin_user:
+            print(f"[HTTP INTERACTION LOG][LỖI] Ko tim thay Admin User ID: {ADMIN_USER_ID}")
+            return web.Response(text="Admin user not found", status=500)
+
+        embed = discord.Embed(
+            title="🖱️ Log Tương Tác Người Dùng",
+            color=discord.Color.from_rgb(120, 220, 180), 
+            timestamp=datetime.fromisoformat(server_timestamp_iso_utc.replace('Z', '+00:00'))
+        )
+        embed.add_field(name="👤 IP", value=f"`{ip}`", inline=True)
+        embed.add_field(name="⏰ Client Time (VN)", value=client_time_hcm, inline=True)
+        embed.add_field(name="📍 Vị trí", value=location, inline=False)
+        
+        details = ""
+        current_lang = event_data.get('language', 'N/A').upper()
+
+        if event_type == 'language_selected':
+            details = f"Chon NN: **{event_data.get('language', 'N/A').upper()}**"
+        elif event_type == 'view_changed':
+            prev = event_data.get('previousView', 'N/A')
+            curr = event_data.get('currentView', 'N/A')
+            details = f"Chuyen View: `{prev}` ➡️ `{curr}` (NN: {current_lang})"
+        elif event_type == 'about_subsection_viewed':
+            prev_sub = event_data.get('previousSubSection', 'N/A')
+            curr_sub = event_data.get('currentSubSection', 'N/A')
+            details = f"Xem About: `{prev_sub}` ➡️ `{curr_sub}` (NN: {current_lang})"
+        elif event_type == 'gallery_image_viewed':
+            idx = event_data.get('imageIndex', -1)
+            total = event_data.get('totalImages', 0)
+            action = event_data.get('action', 'nav') # nav, open_lightbox, carousel_side_click
+            action_text = "nav"
+            if action == 'open_lightbox': action_text = "mo lightbox"
+            elif action == 'carousel_side_click': action_text = "click anh phu"
+            details = f"Xem Gallery: `Anh {idx + 1}/{total}` ({action_text}) (NN: {current_lang})"
+            if 'imageUrl' in event_data and event_data['imageUrl']: # Check neu co URL
+                embed.set_thumbnail(url=event_data['imageUrl']) 
+        elif event_type == 'guestbook_entry_viewed':
+            details = f"Xem Guestbook ID: `{event_data.get('entryId', 'N/A')}` (NN: {current_lang})"
+        elif event_type == 'guestbook_entry_submitted':
+            name = event_data.get('name', 'An danh')
+            snippet = event_data.get('messageSnippet', '')
+            details = f"Gui Guestbook: `{name}`, Snippet: \"{snippet}\" (NN: {current_lang})"
+        else:
+            details = f"Event: `{event_type}`\nData: ```json\n{json.dumps(event_data, indent=2, ensure_ascii=False)}\n```"
+            if len(details) > 1024: # Discord field limit
+                details = details[:1020] + "..." 
+
+        embed.add_field(name="🔎 Hành động", value=details, inline=False)
+        embed.add_field(name="🖥️ Thiết bị", value=f"```{user_agent}```", inline=False)
+        embed.set_footer(text="rin-personal-card | interaction log")
+
+        await send_dm_safe(admin_user, embed=embed, context_log="Interaction Log")
+        # print(f"[HTTP INTERACTION LOG] Da gui tbao log cho Admin: Event {event_type}, IP {ip}") # comment out
+
+        return web.Response(text="Interaction logged by Mizuki.", status=200)
+    except json.JSONDecodeError:
+        print("[HTTP INTERACTION LOG][LỖI] Du lieu POST ko phai JSON.")
+        return web.Response(text="Bad Request: Invalid JSON", status=400)
+    except Exception as e:
+        print(f"[HTTP INTERACTION LOG][LỖI] Xu ly log: {e}")
+        return web.Response(text=f"Internal Server Error: {e}", status=500)
+
 async def setup_http_server():
     global http_runner
     app = web.Application()
     app.router.add_post('/notify-visit', handle_notify_visit)
-
+    app.router.add_post('/log-interaction', handle_log_interaction) # THEM ROUTE MOI
+    
     http_runner = web.AppRunner(app)
     await http_runner.setup()
-
-    effective_port = int(os.getenv('PORT', MIZUKI_HTTP_PORT_STR))
-
-    site = web.TCPSite(http_runner, '0.0.0.0', effective_port)
+    
+    effective_port = int(os.getenv('PORT', MIZUKI_HTTP_PORT_STR)) 
+    
+    site = web.TCPSite(http_runner, '0.0.0.0', effective_port) 
     await site.start()
-    print(f"🌍 Mizuki HTTP server đang lắng nghe trên port {effective_port}...")
+    print(f"🌍 Mizuki HTTP server dang lang nghe tren port {effective_port}...")
 
-# --- Sự kiện Bot (giữ nguyên on_ready, on_message) ---
 @client.event
 async def on_ready():
-    print(f'>>> Đã đăng nhập: {client.user.name} ({client.user.id}) <<<')
-    print("--- Mizuki đơn giản hóa ---")
-    print(f"--- Prefix lệnh Mizuki: {COMMAND_PREFIX} ---")
-    print(f"--- Prefix lệnh Shiromi (tham khảo): {SHIROMI_COMMAND_PREFIX_REFERENCE} ---")
+    print(f'>>> Da dang nhap: {client.user.name} ({client.user.id}) <<<')
+    print("--- Mizuki don gian hoa ---")
+    print(f"--- Prefix lenh Mizuki: {COMMAND_PREFIX} ---")
+    print(f"--- Prefix lenh Shiromi (tham khao): {SHIROMI_COMMAND_PREFIX_REFERENCE} ---")
     if not ADMIN_USER_ID:
-        print(">>> LỖI NGHIÊM TRỌNG: ADMIN_USER_ID KO HỢP LỆ! Bot sẽ ko h.động. <<<")
+        print(">>> LỖI NGHIEM TRONG: ADMIN_USER_ID KO HOP LE! Bot se ko h.dong. <<<")
     else:
-        print(">>> Bot đã sẵn sàng nhận lệnh DM từ Admin! <<<")
+        print(">>> Bot da san sang nhan lenh DM tu Admin! <<<")
         await setup_http_server()
 
 @client.event
@@ -233,16 +302,16 @@ async def on_message(message: discord.Message):
     if not isinstance(message.channel, discord.DMChannel) or message.author.id != ADMIN_USER_ID:
         return
 
-    print(f"[DM NHẬN] Từ Admin ({ADMIN_USER_ID}): {message.content[:100]}...")
+    # print(f"[DM NHAN] Tu Admin ({ADMIN_USER_ID}): {message.content[:100]}...") # comment out
 
     if message.content.startswith(f"{COMMAND_PREFIX}shiromi_cmd"):
-        print(f"[DM LỆNH SHIROMI] Admin {ADMIN_USER_ID} gửi: {message.content}")
+        # print(f"[DM LENH SHIROMI] Admin {ADMIN_USER_ID} gui: {message.content}") # comment out
         try:
             parts = message.content[len(COMMAND_PREFIX) + len("shiromi_cmd"):].strip().split(maxsplit=1)
             if len(parts) < 2:
                 await send_dm_safe(message.channel,
-                                   f"⚠️ Cú pháp: `{COMMAND_PREFIX}shiromi_cmd <kênh_ID/tên> <lệnh_cho_Shiromi>`\n"
-                                   f"*Ko cần prefix Shiromi (`{SHIROMI_COMMAND_PREFIX_REFERENCE}`).*\n"
+                                   f"⚠️ Cu phap: `{COMMAND_PREFIX}shiromi_cmd <kenh_ID/ten> <lenh_cho_Shiromi>`\n"
+                                   f"*Ko can prefix Shiromi (`{SHIROMI_COMMAND_PREFIX_REFERENCE}`).*\n"
                                    f"Vd: `{COMMAND_PREFIX}shiromi_cmd general romi`",
                                    context_log="DM Shiromi Cmd Usage")
                 return
@@ -256,24 +325,24 @@ async def on_message(message: discord.Message):
                 try:
                     await target_channel.send(shiromi_command_to_send)
                     await send_dm_safe(message.channel,
-                                       f"✅ Đã gửi `{shiromi_command_to_send}` tới `#{target_channel.name}` (`{target_channel.guild.name}`).",
+                                       f"✅ Da gui `{shiromi_command_to_send}` toi `#{target_channel.name}` (`{target_channel.guild.name}`).",
                                        context_log="DM Shiromi Cmd Success")
                 except discord.Forbidden:
-                    await send_dm_safe(message.channel, f"❌ Mizuki ko có quyền gửi vào `#{target_channel.name}`.", context_log="DM Shiromi Cmd Perm Err")
+                    await send_dm_safe(message.channel, f"❌ Mizuki ko co quyen gui vao `#{target_channel.name}`.", context_log="DM Shiromi Cmd Perm Err")
                 except discord.HTTPException as e_http:
-                    await send_dm_safe(message.channel, f"❌ Lỗi HTTP gửi tới `#{target_channel.name}`: {e_http}", context_log="DM Shiromi Cmd HTTP Err")
+                    await send_dm_safe(message.channel, f"❌ Loi HTTP gui toi `#{target_channel.name}`: {e_http}", context_log="DM Shiromi Cmd HTTP Err")
             else:
-                await send_dm_safe(message.channel, f"⚠️ Ko tìm thấy kênh `{target_channel_specifier}`.", context_log="DM Shiromi Chan Not Found")
+                await send_dm_safe(message.channel, f"⚠️ Ko tim thay kenh `{target_channel_specifier}`.", context_log="DM Shiromi Chan Not Found")
         except Exception as e:
-            print(f"[LỖI DM LỆNH SHIROMI] Xử lý: {e}")
-            await send_dm_safe(message.channel, f"🙁 Lỗi xử lý lệnh Shiromi: {e}", context_log="DM Shiromi Cmd Unexpected Err")
+            print(f"[LỖI DM LENH SHIROMI] Xu ly: {e}")
+            await send_dm_safe(message.channel, f"🙁 Loi xu ly lenh Shiromi: {e}", context_log="DM Shiromi Cmd Unexpected Err")
 
     elif message.content.startswith(COMMAND_PREFIX):
-        print(f"[DM LỆNH GỬI THÔ] Admin {ADMIN_USER_ID} gửi: {message.content}")
+        # print(f"[DM LENH GUI THO] Admin {ADMIN_USER_ID} gui: {message.content}") # comment out
         try:
             parts = message.content[len(COMMAND_PREFIX):].strip().split(maxsplit=1)
             if len(parts) < 2:
-                await send_dm_safe(message.channel, f"⚠️ Cú pháp: `{COMMAND_PREFIX}<kênh_ID/tên> <nội_dung>`\nVd: `{COMMAND_PREFIX}general Chào!`", context_log="DM Send Raw Usage")
+                await send_dm_safe(message.channel, f"⚠️ Cu phap: `{COMMAND_PREFIX}<kenh_ID/ten> <noi_dung>`\nVd: `{COMMAND_PREFIX}general Chao!`", context_log="DM Send Raw Usage")
                 return
 
             target_channel_specifier = parts[0]
@@ -284,52 +353,50 @@ async def on_message(message: discord.Message):
             if target_channel:
                 try:
                     await target_channel.send(content_to_send)
-                    await send_dm_safe(message.channel, f"✅ Đã gửi tới `#{target_channel.name}` trong `{target_channel.guild.name}`.", context_log="DM Send Raw Success")
+                    await send_dm_safe(message.channel, f"✅ Da gui toi `#{target_channel.name}` trong `{target_channel.guild.name}`.", context_log="DM Send Raw Success")
                 except discord.Forbidden:
-                    await send_dm_safe(message.channel, f"❌ Ko có quyền gửi vào `#{target_channel.name}`.", context_log="DM Send Raw Perm Err")
+                    await send_dm_safe(message.channel, f"❌ Ko co quyen gui vao `#{target_channel.name}`.", context_log="DM Send Raw Perm Err")
                 except discord.HTTPException as e:
-                    await send_dm_safe(message.channel, f"❌ Lỗi HTTP gửi tới `#{target_channel.name}`: {e}", context_log="DM Send Raw HTTP Err")
+                    await send_dm_safe(message.channel, f"❌ Loi HTTP gui toi `#{target_channel.name}`: {e}", context_log="DM Send Raw HTTP Err")
             else:
-                await send_dm_safe(message.channel, f"⚠️ Ko tìm thấy kênh `{target_channel_specifier}`.", context_log="DM Send Raw Chan Not Found")
+                await send_dm_safe(message.channel, f"⚠️ Ko tim thay kenh `{target_channel_specifier}`.", context_log="DM Send Raw Chan Not Found")
         except Exception as e:
-            print(f"[LỖI DM LỆNH GỬI THÔ] Xử lý: {e}")
-            await send_dm_safe(message.channel, f"🙁 Lỗi khi gửi tin: {e}", context_log="DM Send Raw Unexpected Err")
+            print(f"[LỖI DM LENH GUI THO] Xu ly: {e}")
+            await send_dm_safe(message.channel, f"🙁 Loi khi gui tin: {e}", context_log="DM Send Raw Unexpected Err")
 
-# --- Hàm chạy chính (giữ nguyên từ phiên bản trước) ---
 async def main():
     if not TOKEN:
-        print("[LỖI] Thiếu DISCORD_TOKEN.")
+        print("[LỖI] Thieu DISCORD_TOKEN.")
         return
     if not ADMIN_USER_ID:
-        print("[LỖI] ADMIN_USER_ID ko hợp lệ. Bot ko thể h.động.")
+        print("[LỖI] ADMIN_USER_ID ko hop le. Bot ko the h.dong.")
         return
 
-    # Chạy client.start() như một task nền
     discord_client_task = asyncio.create_task(client.start(TOKEN))
-
+    
     try:
         await discord_client_task
-    except discord.errors.LoginFailure: print("[LỖI] Token Discord ko hợp lệ.")
-    except discord.errors.PrivilegedIntentsRequired: print("[LỖI] Thiếu quyền Privileged Intents.")
-    except discord.errors.ConnectionClosed as e: print(f"[LỖI] Kết nối Discord bị đóng: Code {e.code}, Reason: {e.reason}")
+    except discord.errors.LoginFailure: print("[LỖI] Token Discord ko hop le.")
+    except discord.errors.PrivilegedIntentsRequired: print("[LỖI] Thieu quyen Privileged Intents.")
+    except discord.errors.ConnectionClosed as e: print(f"[LỖI] Ket noi Discord bi dong: Code {e.code}, Reason: {e.reason}")
     except Exception as e:
-        print(f"[LỖI NGHIÊM TRỌNG] Khi chạy bot: {type(e).__name__}: {e}")
+        print(f"[LỖI NGHIEM TRONG] Khi chay bot: {type(e).__name__}: {e}")
     finally:
-        print("[H.THỐNG] Bot đang tắt...")
+        print("[H.THONG] Bot dang tat...")
         if http_runner:
             await http_runner.cleanup()
-            print("[HTTP] Server đã tắt.")
+            print("[HTTP] Server da tat.")
         if client and not client.is_closed():
             await client.close()
-        print("[H.THỐNG] Bot đã tắt.")
+        print("[H.THONG] Bot da tat.")
 
 if __name__ == "__main__":
-    print("--- Khởi động Bot Mizuki (Relay + Gửi thô + HTTP Visit Notify) ---")
+    print("--- Khoi dong Bot Mizuki (Relay + Gui tho + HTTP Visit/Interaction Notify) ---")
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n--- Nhận tín hiệu dừng (Ctrl+C) ---")
+        print("\n--- Nhan tin hieu dung (Ctrl+C) ---")
     except Exception as e:
-        print(f"\n[LỖI ASYNCIO/RUNTIME] Lỗi ko mong muốn ở cấp cao nhất: {type(e).__name__}: {e}")
+        print(f"\n[LỖI ASYNCIO/RUNTIME] Loi ko mong muon o cap cao nhat: {type(e).__name__}: {e}")
     finally:
-        print("--- Chương trình kết thúc ---")
+        print("--- Chuong trinh ket thuc ---")

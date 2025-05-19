@@ -177,7 +177,6 @@ async def handle_notify_visit(request: web.Request):
         print(f"[HTTP NOTIFY VISIT][LOI] Xu ly tbao visit: {e}")
         return web.Response(text=f"Internal Server Error: {e}", status=500)
 
-# Handler moi cho session log
 async def handle_log_session_interactions(request: web.Request):
     received_secret = request.headers.get("X-Mizuki-Secret")
     if MIZUKI_EXPECTED_SECRET and received_secret != MIZUKI_EXPECTED_SECRET:
@@ -237,7 +236,6 @@ async def handle_log_session_interactions(request: web.Request):
                 current_lang = event_data.get('language', 'N/A').upper()
                 action_detail = ""
 
-                # Format chi tiet tung hanh dong
                 if event_type == 'language_selected':
                     action_detail = f"Chon NN: **{event_data.get('language', 'N/A').upper()}**"
                 elif event_type == 'view_changed':
@@ -256,6 +254,21 @@ async def handle_log_session_interactions(request: web.Request):
                     if action == 'open_lightbox': action_text = "mo lightbox"
                     elif action == 'carousel_side_click': action_text = "click anh phu"
                     action_detail = f"Gallery: `Ảnh {idx + 1}/{total}` ({action_text}) (NN: {current_lang})"
+                    # Kiem tra imageUrl truoc khi set thumbnail
+                    image_url_from_event = event_data.get('imageUrl')
+                    if image_url_from_event and isinstance(image_url_from_event, str) and image_url_from_event.strip():
+                        try:
+                            # Ping de kiem tra url co hop le ko truoc khi set
+                            # response_ping = await request.app.aiohttp_session.head(image_url_from_event, timeout=2)
+                            # if response_ping.status == 200:
+                            #      embed.set_thumbnail(url=image_url_from_event)
+                            # else:
+                            #      print(f"[HTTP SESSION LOG][WARN] Thumbnail URL ko hop le (status {response_ping.status}): {image_url_from_event}")
+                            # Bo qua ping, discord se tu xu ly, neu loi thi cung la do url sai
+                            embed.set_thumbnail(url=image_url_from_event)
+                        except Exception as e_thumb:
+                            print(f"[HTTP SESSION LOG][WARN] Loi khi set thumbnail: {e_thumb} cho url: {image_url_from_event}")
+                            pass # Bo qua neu set thumbnail loi
                 elif event_type == 'guestbook_entry_viewed':
                     action_detail = f"Guestbook: xem ID `{event_data.get('entryId', 'N/A')}` (NN: {current_lang})"
                 elif event_type == 'guestbook_entry_submitted':
@@ -270,10 +283,10 @@ async def handle_log_session_interactions(request: web.Request):
                 interaction_lines.append(f"`{client_time_hcm_short}` {action_detail}")
 
             actions_summary = "\n".join(interaction_lines)
-            if len(actions_summary) > 1020: # gioi han ky tu field discord
+            if len(actions_summary) > 1020: 
                 actions_summary = actions_summary[:1020] + "\n... (và các hành động khác)"
         
-        embed.add_field(name="📜 Hành động trong phiên", value=actions_summary if actions_summary else "Không có hành động.", inline=False)
+        embed.add_field(name="📜 Hành động trong phiên", value=actions_summary, inline=False)
         embed.set_footer(text="rin-personal-card | session interaction log")
 
         await send_dm_safe(admin_user, embed=embed, context_log="Session Log")
@@ -289,10 +302,10 @@ async def handle_log_session_interactions(request: web.Request):
 async def setup_http_server():
     global http_runner
     app = web.Application()
+    # Them client_max_size de xu ly payload lon hon tu client (mac dinh la 1MB)
+    # app = web.Application(client_max_size=1024*1024*5) # 5MB
     app.router.add_post('/notify-visit', handle_notify_visit)
-    # Xoa/comment out route log cu
-    # app.router.add_post('/log-interaction', handle_log_interaction) 
-    app.router.add_post('/log-session-interactions', handle_log_session_interactions) # Them route moi
+    app.router.add_post('/log-session-interactions', handle_log_session_interactions) 
     
     http_runner = web.AppRunner(app)
     await http_runner.setup()
@@ -319,6 +332,9 @@ async def on_ready():
     else:
         print(">>> Bot da san sang nhan lenh DM tu Admin! <<<")
         try:
+            # Khoi tao session cho aiohttp neu can ping URL thumbnail
+            # client_session = aiohttp.ClientSession()
+            # client.aiohttp_session = client_session # Gan vao client instance de truy cap trong handler
             await setup_http_server() 
         except Exception as e:
             print(f"[LOI] Khong the khoi tao HTTP server: {e}")

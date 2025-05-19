@@ -6,7 +6,6 @@ import asyncio
 import json
 from datetime import datetime, timezone, timedelta
 from aiohttp import web
-
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 ADMIN_USER_ID_STR = os.getenv('ADMIN_USER_ID', '873576591693873252')
@@ -28,16 +27,16 @@ if ADMIN_USER_ID_STR:
         ADMIN_USER_ID = int(ADMIN_USER_ID_STR)
         print(f"[CFG] ID Admin: {ADMIN_USER_ID}")
     except ValueError:
-        print(f"[LỖI] ADMIN_USER_ID '{ADMIN_USER_ID_STR}' ko phai so.")
+        print(f"[LOI] ADMIN_USER_ID '{ADMIN_USER_ID_STR}' ko phai so.")
         ADMIN_USER_ID = None
 else:
-    print("[LỖI] ADMIN_USER_ID chua dc cfg.")
+    print("[LOI] ADMIN_USER_ID chua dc cfg.")
 
 MIZUKI_HTTP_PORT = 8080 
 try:
     MIZUKI_HTTP_PORT = int(MIZUKI_HTTP_PORT_STR)
 except ValueError:
-    print(f"[LỖI] MIZUKI_HTTP_PORT '{MIZUKI_HTTP_PORT_STR}' ko hop le. Dung port mac dinh: {MIZUKI_HTTP_PORT}")
+    print(f"[LOI] MIZUKI_HTTP_PORT '{MIZUKI_HTTP_PORT_STR}' ko hop le. Dung port mac dinh: {MIZUKI_HTTP_PORT}")
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -51,7 +50,7 @@ http_runner = None
 
 async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = None, embed: discord.Embed = None, context_log: str = "DM"):
     if not user:
-        print(f"[DM CHECK][LỖI] Nguoi nhan ko hop le ({context_log}).")
+        print(f"[DM CHECK][LOI] Nguoi nhan ko hop le ({context_log}).")
         return
     target_channel : discord.abc.Messageable = None
     target_recipient_info = "Ko xac dinh"
@@ -66,16 +65,16 @@ async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = No
             else:
                 target_channel = user.dm_channel
         else:
-            print(f"[DM CHECK][LỖI] Loai nguoi nhan ko xd: {type(user)}")
+            print(f"[DM CHECK][LOI] Loai nguoi nhan ko xd: {type(user)}")
             return
 
         if not target_channel:
-            print(f"[DM CHECK][LỖI] Ko the xd kenh DM toi {target_recipient_info} ({context_log}).")
+            print(f"[DM CHECK][LOI] Ko the xd kenh DM toi {target_recipient_info} ({context_log}).")
             return
         
         if embed:
             await target_channel.send(embed=embed)
-            # print(f"[DM CHECK] Gui EMBED {context_log} toi {target_recipient_info} thanh cong.") # comment out
+            # print(f"[DM CHECK] Gui EMBED {context_log} toi {target_recipient_info} thanh cong.")
             return
 
         if content:
@@ -86,16 +85,16 @@ async def send_dm_safe(user: discord.User | discord.DMChannel, content: str = No
                 for i, chunk in enumerate(chunks):
                     await target_channel.send(f"**(Phan {i+1}/{len(chunks)})**\n{chunk}")
                     await asyncio.sleep(0.6)
-            # print(f"[DM CHECK] Gui TEXT {context_log} toi {target_recipient_info} thanh cong.") # comment out
+            # print(f"[DM CHECK] Gui TEXT {context_log} toi {target_recipient_info} thanh cong.")
         else:
-            print(f"[DM CHECK][LỖI] Ko co content/embed de gui {context_log} toi {target_recipient_info}.")
+            print(f"[DM CHECK][LOI] Ko co content/embed de gui {context_log} toi {target_recipient_info}.")
 
     except discord.Forbidden:
-        print(f"[DM CHECK][LỖI] Ko co quyen gui {context_log} toi {target_recipient_info}.")
+        print(f"[DM CHECK][LOI] Ko co quyen gui {context_log} toi {target_recipient_info}.")
     except discord.HTTPException as e:
-        print(f"[DM CHECK][LỖI] Loi HTTP {e.status} khi gui {context_log}: {e.text}")
+        print(f"[DM CHECK][LOI] Loi HTTP {e.status} khi gui {context_log}: {e.text}")
     except Exception as e:
-        print(f"[DM CHECK][LỖI] Gui {context_log}: {e}")
+        print(f"[DM CHECK][LOI] Gui {context_log}: {e}")
 
 
 async def find_target_channel(specifier: str) -> discord.TextChannel | None:
@@ -133,9 +132,10 @@ def format_timestamp_hcm(timestamp_iso_utc_str: str) -> str:
     return dt_object_hcm.strftime('%H:%M:%S %d/%m/%Y (GMT+7)')
 
 async def handle_notify_visit(request: web.Request):
+    # print("[HTTP NOTIFY VISIT] Nhan request...") # Them log
     received_secret = request.headers.get("X-Mizuki-Secret")
     if MIZUKI_EXPECTED_SECRET and received_secret != MIZUKI_EXPECTED_SECRET:
-        # print("[HTTP NOTIFY VISIT][LỖI] Sai secret key. Bo qua.") # comment out
+        print("[HTTP NOTIFY VISIT][LOI] Sai secret key. Bo qua.") 
         return web.Response(text="Forbidden: Invalid secret", status=403)
     try:
         data = await request.json()
@@ -173,24 +173,25 @@ async def handle_notify_visit(request: web.Request):
             await send_dm_safe(admin_user, embed=embed, context_log="Visit Notify")
             # print(f"[HTTP NOTIFY VISIT] Da gui tbao visit cho Admin: IP {ip}") # comment out
         else:
-            print(f"[HTTP NOTIFY VISIT][LỖI] Ko tim thay Admin User ID: {ADMIN_USER_ID}")
+            print(f"[HTTP NOTIFY VISIT][LOI] Ko tim thay Admin User ID: {ADMIN_USER_ID}")
         return web.Response(text="Notification received by Mizuki.", status=200)
     except json.JSONDecodeError: 
-        print("[HTTP NOTIFY VISIT][LỖI] Du lieu POST ko phai JSON.")
+        print("[HTTP NOTIFY VISIT][LOI] Du lieu POST ko phai JSON.")
         return web.Response(text="Bad Request: Invalid JSON", status=400)
     except Exception as e:
-        print(f"[HTTP NOTIFY VISIT][LỖI] Xu ly tbao visit: {e}")
+        print(f"[HTTP NOTIFY VISIT][LOI] Xu ly tbao visit: {e}")
         return web.Response(text=f"Internal Server Error: {e}", status=500)
 
-# HANDLER MOI CHO LOG INTERACTION
 async def handle_log_interaction(request: web.Request):
+    # print("[HTTP INTERACTION LOG] Nhan request...") # Them log
     received_secret = request.headers.get("X-Mizuki-Secret")
     if MIZUKI_EXPECTED_SECRET and received_secret != MIZUKI_EXPECTED_SECRET:
-        # print("[HTTP INTERACTION LOG][LỖI] Sai secret key. Bo qua.") # comment out
+        print("[HTTP INTERACTION LOG][LOI] Sai secret key. Bo qua.") 
         return web.Response(text="Forbidden: Invalid secret", status=403)
 
     try:
         data = await request.json()
+        # print(f"[HTTP INTERACTION LOG] Raw data: {data}") # Log raw data
         ip = data.get("ip", "N/A")
 
         if ip in EXCLUDED_IPS:
@@ -209,7 +210,7 @@ async def handle_log_interaction(request: web.Request):
         
         admin_user = await client.fetch_user(ADMIN_USER_ID)
         if not admin_user:
-            print(f"[HTTP INTERACTION LOG][LỖI] Ko tim thay Admin User ID: {ADMIN_USER_ID}")
+            print(f"[HTTP INTERACTION LOG][LOI] Ko tim thay Admin User ID: {ADMIN_USER_ID}")
             return web.Response(text="Admin user not found", status=500)
 
         embed = discord.Embed(
@@ -231,18 +232,18 @@ async def handle_log_interaction(request: web.Request):
             curr = event_data.get('currentView', 'N/A')
             details = f"Chuyen View: `{prev}` ➡️ `{curr}` (NN: {current_lang})"
         elif event_type == 'about_subsection_viewed':
-            prev_sub = event_data.get('previousSubSection', 'N/A')
-            curr_sub = event_data.get('currentSubSection', 'N/A')
+            prev_sub = event_data.get('previousSubSection', 'N/A') # Fix: Lay prevSubSection
+            curr_sub = event_data.get('currentSubSection', 'N/A') # Fix: Lay currentSubSection
             details = f"Xem About: `{prev_sub}` ➡️ `{curr_sub}` (NN: {current_lang})"
         elif event_type == 'gallery_image_viewed':
             idx = event_data.get('imageIndex', -1)
             total = event_data.get('totalImages', 0)
-            action = event_data.get('action', 'nav') # nav, open_lightbox, carousel_side_click
+            action = event_data.get('action', 'nav') 
             action_text = "nav"
             if action == 'open_lightbox': action_text = "mo lightbox"
             elif action == 'carousel_side_click': action_text = "click anh phu"
             details = f"Xem Gallery: `Anh {idx + 1}/{total}` ({action_text}) (NN: {current_lang})"
-            if 'imageUrl' in event_data and event_data['imageUrl']: # Check neu co URL
+            if 'imageUrl' in event_data and event_data['imageUrl']: 
                 embed.set_thumbnail(url=event_data['imageUrl']) 
         elif event_type == 'guestbook_entry_viewed':
             details = f"Xem Guestbook ID: `{event_data.get('entryId', 'N/A')}` (NN: {current_lang})"
@@ -251,9 +252,11 @@ async def handle_log_interaction(request: web.Request):
             snippet = event_data.get('messageSnippet', '')
             details = f"Gui Guestbook: `{name}`, Snippet: \"{snippet}\" (NN: {current_lang})"
         else:
-            details = f"Event: `{event_type}`\nData: ```json\n{json.dumps(event_data, indent=2, ensure_ascii=False)}\n```"
-            if len(details) > 1024: # Discord field limit
-                details = details[:1020] + "..." 
+            details_json_str = json.dumps(event_data, indent=2, ensure_ascii=False)
+            if len(details_json_str) > 980 : # De cho "Event: ...\nData: ```json\n...\n```"
+                details_json_str = details_json_str[:980] + "..."
+            details = f"Event: `{event_type}`\nData: ```json\n{details_json_str}\n```"
+
 
         embed.add_field(name="🔎 Hành động", value=details, inline=False)
         embed.add_field(name="🖥️ Thiết bị", value=f"```{user_agent}```", inline=False)
@@ -264,17 +267,17 @@ async def handle_log_interaction(request: web.Request):
 
         return web.Response(text="Interaction logged by Mizuki.", status=200)
     except json.JSONDecodeError:
-        print("[HTTP INTERACTION LOG][LỖI] Du lieu POST ko phai JSON.")
+        print("[HTTP INTERACTION LOG][LOI] Du lieu POST ko phai JSON.")
         return web.Response(text="Bad Request: Invalid JSON", status=400)
     except Exception as e:
-        print(f"[HTTP INTERACTION LOG][LỖI] Xu ly log: {e}")
+        print(f"[HTTP INTERACTION LOG][LOI] Xu ly log: {e}")
         return web.Response(text=f"Internal Server Error: {e}", status=500)
 
 async def setup_http_server():
     global http_runner
     app = web.Application()
     app.router.add_post('/notify-visit', handle_notify_visit)
-    app.router.add_post('/log-interaction', handle_log_interaction) # THEM ROUTE MOI
+    app.router.add_post('/log-interaction', handle_log_interaction) 
     
     http_runner = web.AppRunner(app)
     await http_runner.setup()
@@ -282,8 +285,13 @@ async def setup_http_server():
     effective_port = int(os.getenv('PORT', MIZUKI_HTTP_PORT_STR)) 
     
     site = web.TCPSite(http_runner, '0.0.0.0', effective_port) 
-    await site.start()
-    print(f"🌍 Mizuki HTTP server dang lang nghe tren port {effective_port}...")
+    try:
+        await site.start()
+        print(f"🌍 Mizuki HTTP server dang lang nghe tren port {effective_port}...")
+    except OSError as e: # Bat loi khi port da duoc su dung
+         print(f"[LOI HTTP SERVER] Khong the start server tren port {effective_port}: {e}")
+         print("[LOI HTTP SERVER] Bot se tiep tuc chay ma khong co HTTP server.")
+
 
 @client.event
 async def on_ready():
@@ -292,10 +300,14 @@ async def on_ready():
     print(f"--- Prefix lenh Mizuki: {COMMAND_PREFIX} ---")
     print(f"--- Prefix lenh Shiromi (tham khao): {SHIROMI_COMMAND_PREFIX_REFERENCE} ---")
     if not ADMIN_USER_ID:
-        print(">>> LỖI NGHIEM TRONG: ADMIN_USER_ID KO HOP LE! Bot se ko h.dong. <<<")
+        print(">>> LOI NGHIEM TRONG: ADMIN_USER_ID KO HOP LE! Bot se ko h.dong. <<<")
     else:
         print(">>> Bot da san sang nhan lenh DM tu Admin! <<<")
-        await setup_http_server()
+        try:
+            await setup_http_server() # GOI HTTP SETUP O DAY
+        except Exception as e:
+            print(f"[LOI] Khong the khoi tao HTTP server: {e}")
+
 
 @client.event
 async def on_message(message: discord.Message):
@@ -334,7 +346,7 @@ async def on_message(message: discord.Message):
             else:
                 await send_dm_safe(message.channel, f"⚠️ Ko tim thay kenh `{target_channel_specifier}`.", context_log="DM Shiromi Chan Not Found")
         except Exception as e:
-            print(f"[LỖI DM LENH SHIROMI] Xu ly: {e}")
+            print(f"[LOI DM LENH SHIROMI] Xu ly: {e}")
             await send_dm_safe(message.channel, f"🙁 Loi xu ly lenh Shiromi: {e}", context_log="DM Shiromi Cmd Unexpected Err")
 
     elif message.content.startswith(COMMAND_PREFIX):
@@ -361,26 +373,29 @@ async def on_message(message: discord.Message):
             else:
                 await send_dm_safe(message.channel, f"⚠️ Ko tim thay kenh `{target_channel_specifier}`.", context_log="DM Send Raw Chan Not Found")
         except Exception as e:
-            print(f"[LỖI DM LENH GUI THO] Xu ly: {e}")
+            print(f"[LOI DM LENH GUI THO] Xu ly: {e}")
             await send_dm_safe(message.channel, f"🙁 Loi khi gui tin: {e}", context_log="DM Send Raw Unexpected Err")
 
 async def main():
     if not TOKEN:
-        print("[LỖI] Thieu DISCORD_TOKEN.")
+        print("[LOI] Thieu DISCORD_TOKEN.")
         return
     if not ADMIN_USER_ID:
-        print("[LỖI] ADMIN_USER_ID ko hop le. Bot ko the h.dong.")
+        print("[LOI] ADMIN_USER_ID ko hop le. Bot ko the h.dong.")
         return
+
+    # Khoi dong HTTP server TRUOC khi start Discord client de tranh loi port
+    # await setup_http_server() # Da chuyen vao on_ready
 
     discord_client_task = asyncio.create_task(client.start(TOKEN))
     
     try:
         await discord_client_task
-    except discord.errors.LoginFailure: print("[LỖI] Token Discord ko hop le.")
-    except discord.errors.PrivilegedIntentsRequired: print("[LỖI] Thieu quyen Privileged Intents.")
-    except discord.errors.ConnectionClosed as e: print(f"[LỖI] Ket noi Discord bi dong: Code {e.code}, Reason: {e.reason}")
+    except discord.errors.LoginFailure: print("[LOI] Token Discord ko hop le.")
+    except discord.errors.PrivilegedIntentsRequired: print("[LOI] Thieu quyen Privileged Intents.")
+    except discord.errors.ConnectionClosed as e: print(f"[LOI] Ket noi Discord bi dong: Code {e.code}, Reason: {e.reason}")
     except Exception as e:
-        print(f"[LỖI NGHIEM TRONG] Khi chay bot: {type(e).__name__}: {e}")
+        print(f"[LOI NGHIEM TRONG] Khi chay bot: {type(e).__name__}: {e}")
     finally:
         print("[H.THONG] Bot dang tat...")
         if http_runner:
@@ -397,7 +412,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n--- Nhan tin hieu dung (Ctrl+C) ---")
     except Exception as e:
-        print(f"\n[LỖI ASYNCIO/RUNTIME] Loi ko mong muon o cap cao nhat: {type(e).__name__}: {e}")
+        print(f"\n[LOI ASYNCIO/RUNTIME] Loi ko mong muon o cap cao nhat: {type(e).__name__}: {e}")
     finally:
         print("--- Chuong trinh ket thuc ---")
-# abc

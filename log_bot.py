@@ -5,14 +5,19 @@ from dotenv import load_dotenv
 import asyncio
 import json
 from datetime import datetime, timezone, timedelta
-from aiohttp import web
+from aiohttp import web, ClientSession 
 import hashlib 
+import re 
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 ADMIN_USER_ID_STR = os.getenv('ADMIN_USER_ID', '873576591693873252')
 MIZUKI_HTTP_PORT_STR = os.getenv('MIZUKI_HTTP_PORT', os.getenv('PORT', '8080'))
 MIZUKI_EXPECTED_SECRET = os.getenv('MIZUKI_SHARED_SECRET', 'default_secret_key_for_mizuki')
+RIN_PERSONAL_CARD_API_URL = os.getenv('RIN_PERSONAL_CARD_API_URL') # lay url api
+if not RIN_PERSONAL_CARD_API_URL:
+    print("[LOI CFG] RIN_PERSONAL_CARD_API_URL chưa được cấu hình trong .env của Mizuki.")
+
 
 EXCLUDED_IPS_RAW = os.getenv('EXCLUDED_IPS', "")
 EXCLUDED_IPS = [ip.strip() for ip in EXCLUDED_IPS_RAW.split(',') if ip.strip()]
@@ -50,7 +55,6 @@ intents.members = True
 client = discord.Client(intents=intents)
 http_runner = None
 
-# LOG BATCHING
 LOG_BUFFER_LIMIT = 30  
 SESSION_TIMEOUT_SECONDS = 5 * 60 
 FLUSH_INTERVAL_SECONDS = 30      
@@ -309,8 +313,8 @@ async def handle_log_interaction(request: web.Request):
             action_text = f"Xem Gallery: `Anh {idx + 1}/{total}` ({details}) (NN: {current_lang})"
         elif event_type == 'guestbook_entry_viewed':
             entry_id = event_data.get('entryId', 'N/A')
-            message_snippet = event_data.get('messageSnippet', 'N/A') # Lay snippet
-            action_text = f"Xem Guestbook: \"{message_snippet}\" (ID: `{entry_id}`, NN: {current_lang})" # Sua action_text
+            message_snippet = event_data.get('messageSnippet', 'N/A')
+            action_text = f"Xem Guestbook: \"{message_snippet}\" (ID: `{entry_id}`, NN: {current_lang})"
         elif event_type == 'guestbook_entry_submitted':
             name = event_data.get('name', 'An danh')
             snippet = event_data.get('messageSnippet', '')
@@ -372,6 +376,62 @@ async def setup_http_server():
          print("[HTTP][WARN] Bot chay ko co HTTP server.")
 
 
+# xu ly lenh blog
+async def handle_blog_command(message: discord.Message, command_content: str):
+    if message.author.id != ADMIN_USER_ID:
+        await send_dm_safe(message.channel, "⚠️ Bạn không có quyền đăng blog.", context_log="BlogPermDenied")
+        return
+
+    title_match = re.match(r"^\s*(.+?)\s*(?:\(|$)".strip(), command_content)
+    title = title_match.group(1).strip() if title_match else None
+
+    if not title:
+        await send_dm_safe(message.channel, "⚠️ Vui lòng nhập tiêu đề cho bài blog.\nCú pháp: `blog <Tiêu đề bài viết> (đính kèm ảnh nếu có)`", context_log="BlogNoTitle")
+        return
+
+    image_url = None
+    if message.attachments and len(message.attachments) > 0:
+        attachment = message.attachments[0] 
+        if attachment.content_type and attachment.content_type.startswith('image/'):
+            image_url = attachment.url
+        else:
+            await send_dm_safe(message.channel, "⚠️ File đính kèm không phải là hình ảnh hợp lệ.", context_log="BlogInvalidAttachment")
+    
+    blog_content = None # hien tai ko co content
+
+    blog_post_data = {
+        "title": title,
+        "content": blog_content,
+        "image_url": image_url,
+        "discord_message_id": str(message.id),
+        "discord_author_id": str(message.author.id)
+    }
+
+    if not RIN_PERSONAL_CARD_API_URL:
+        await send_dm_safe(message.channel, "🙁 Lỗi cấu hình: URL của server blog chưa được thiết lập cho Mizuki.", context_log="BlogAPIMissing")
+        return
+
+    try:
+        api_url = f"{RIN_PERSONAL_CARD_API_URL}/api/blog/posts"
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Mizuki-Secret': MIZUKI_EXPECTED_SECRET 
+        }
+        async with ClientSession() as session:
+            async with session.post(api_url, json=blog_post_data, headers=headers) as response:
+                if response.status == 201:
+                    response_data = await response.json()
+                    await send_dm_safe(message.channel, f"✅ Đã đăng blog: '{response_data.get('title', title)}'\nID bài viết: {response_data.get('id')}", context_log="BlogPostSuccess")
+                elif response.status == 409:
+                    await send_dm_safe(message.channel, "⚠️ Bài blog này (dựa trên ID tin nhắn Discord) đã được đăng trước đó.", context_log="BlogPostDuplicate")
+                else:
+                    error_text = await response.text()
+                    await send_dm_safe(message.channel, f"❌ Lỗi khi đăng blog: Server phản hồi {response.status} - {error_text}", context_log="BlogPostAPIError")
+    except Exception as e:
+        print(f"[BLOG_CMD][LOI] Lỗi gửi API: {e}")
+        await send_dm_safe(message.channel, f"🙁 Có lỗi xảy ra khi kết nối tới server blog: {e}", context_log="BlogPostNetworkError")
+
+
 @client.event
 async def on_ready():
     print(f'>>> Logged in: {client.user.name} ({client.user.id}) <<<')
@@ -424,6 +484,10 @@ async def on_message(message: discord.Message):
         except Exception as e:
             print(f"[SHIROMI_CMD][LOI] Xu ly: {e}")
             await send_dm_safe(message.channel, f"🙁 Loi xu ly lenh Shiromi: {e}", context_log="DM Shiromi Cmd Unexpected Err")
+    
+    elif message.content.startswith(f"{COMMAND_PREFIX}blog"):
+        command_content = message.content[len(COMMAND_PREFIX) + len("blog"):].strip()
+        await handle_blog_command(message, command_content)
 
     elif message.content.startswith(COMMAND_PREFIX): 
         try:

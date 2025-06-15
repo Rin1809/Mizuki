@@ -10,7 +10,7 @@ const LanguageChart = () => {
     const { t } = useLanguage();
 
     useEffect(() => {
-        fetch('/api/stats/language-distribution')
+        fetch('/api/stats?endpoint=language-distribution')
             .then(res => res.json())
             .then(data => {
                 if (!data || !data.languageDistribution) return;

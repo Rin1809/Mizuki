@@ -10,7 +10,7 @@ const IspDistributionChart = () => {
     const { t } = useLanguage();
 
     useEffect(() => {
-        fetch('/api/stats/isp-distribution')
+        fetch('/api/stats?endpoint=isp-distribution')
             .then(res => res.json())
             .then(data => {
                 if (!data || !data.ispDistribution) return;

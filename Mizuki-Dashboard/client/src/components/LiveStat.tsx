@@ -6,7 +6,7 @@ const LiveStat = () => {
     const { t } = useLanguage();
 
     const fetchLiveCount = () => {
-        fetch('/api/stats/live-visitors')
+        fetch('/api/stats?endpoint=live-visitors')
             .then(res => res.json())
             .then(data => {
                 setLiveCount(data.live_count);

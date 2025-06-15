@@ -15,7 +15,7 @@ const TopVisitorsTable = () => {
   const { t, locale } = useLanguage();
 
   useEffect(() => {
-    fetch('/api/stats/top-visitors')
+    fetch('/api/stats?endpoint=top-visitors')
       .then(res => res.json())
       .then(data => {
         if (data && data.topVisitors) {

@@ -10,7 +10,7 @@ const TopCitiesChart = () => {
     const { t } = useLanguage();
 
     useEffect(() => {
-        fetch('/api/stats/city-distribution')
+        fetch('/api/stats?endpoint=city-distribution')
             .then(res => res.json())
             .then(data => {
                 if (!data || !data.cityDistribution) return;

@@ -11,7 +11,7 @@ const VisitorDistributionPieChart = () => {
     const { t, locale } = useLanguage();
 
     useEffect(() => {
-        fetch('/api/stats/visitor-distribution')
+        fetch('/api/stats?endpoint=visitor-distribution')
             .then(res => res.json())
             .then(data => {
                 if (!data || !data.distribution) return;

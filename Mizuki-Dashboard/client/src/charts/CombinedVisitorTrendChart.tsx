@@ -14,8 +14,8 @@ const CombinedVisitorTrendChart = () => {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/stats/visits?period=day').then(res => res.json()),
-      fetch('/api/stats/visitor-trends').then(res => res.json())
+      fetch('/api/stats?endpoint=visits&period=day').then(res => res.json()),
+      fetch('/api/stats?endpoint=visitor-trends').then(res => res.json())
     ])
     .then(([visitsData, trendsData]) => {
       if (!visitsData?.byTime || !trendsData?.trends) {

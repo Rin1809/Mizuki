@@ -12,7 +12,7 @@ const VisitorTrendChart = () => {
   const { t, locale } = useLanguage();
 
   useEffect(() => {
-    fetch(`/api/stats/visitor-trends`)
+    fetch(`/api/stats?endpoint=visitor-trends`)
       .then(res => res.json())
       .then(data => {
         if (!data || !data.trends) return;

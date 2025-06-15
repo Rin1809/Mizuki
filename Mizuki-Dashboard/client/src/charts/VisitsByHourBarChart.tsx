@@ -11,7 +11,7 @@ const VisitsByHourBarChart = () => {
     const { t } = useLanguage();
 
     useEffect(() => {
-        fetch('/api/stats/visits-by-hour')
+        fetch('/api/stats?endpoint=visits-by-hour')
             .then(res => res.json())
             .then(data => {
                 if (!data || !data.distribution) {

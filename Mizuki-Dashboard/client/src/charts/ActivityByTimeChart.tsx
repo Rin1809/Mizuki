@@ -12,11 +12,10 @@ const ActivityHeatmapChart = () => {
     const [loading, setLoading] = useState(true);
     const { t } = useLanguage();
     
-    // FIX: Lay truc tiep mang tu ham t(), ko can .split()
     const dayLabels: string[] = t('chartLabels.days') as any;
 
     useEffect(() => {
-        fetch('/api/stats/activity-by-time')
+        fetch('/api/stats?endpoint=activity-by-time')
             .then(res => res.json())
             .then(data => {
                 if (!data.heatmapData) {

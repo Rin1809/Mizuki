@@ -10,7 +10,7 @@ const InteractionTypesChart = () => {
     const { t } = useLanguage();
 
     useEffect(() => {
-        fetch('/api/stats/interactions')
+        fetch('/api/stats?endpoint=interactions')
             .then(res => res.json())
             .then(data => {
                 if (!data || !data.eventTypeCounts) return;

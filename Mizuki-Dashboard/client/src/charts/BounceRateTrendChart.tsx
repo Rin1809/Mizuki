@@ -13,7 +13,7 @@ const BounceRateTrendChart = () => {
     const { t, locale } = useLanguage();
 
     useEffect(() => {
-        fetch('/api/stats/bounce-rate-trends')
+        fetch('/api/stats?endpoint=bounce-rate-trends')
             .then(res => res.json())
             .then(apiResponse => {
                 if (!apiResponse || !apiResponse.trends) {

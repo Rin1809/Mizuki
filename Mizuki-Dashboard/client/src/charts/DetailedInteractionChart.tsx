@@ -24,7 +24,7 @@ const DetailedInteractionChart = ({ type }: DetailedInteractionChartProps) => {
     const config = chartConfig[type];
 
     useEffect(() => {
-        fetch(`/api/stats/detailed-interactions?type=${type}`)
+        fetch(`/api/stats?endpoint=detailed-interactions&type=${type}`)
             .then(res => res.json())
             .then(apiResponse => {
                 if (!apiResponse || !apiResponse.data) return;

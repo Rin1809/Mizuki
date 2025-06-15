@@ -36,7 +36,7 @@ const PlatformAnalytics = () => {
     const { t } = useLanguage();
 
     useEffect(() => {
-        fetch('/api/stats/platform-distribution')
+        fetch('/api/stats?endpoint=platform-distribution')
             .then(res => res.json())
             .then(data => {
                 if (data.byBrowser) {

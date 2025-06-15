@@ -16,7 +16,7 @@ const VisitsByTimeChart = ({ period }: VisitsByTimeChartProps) => {
   const { t, locale } = useLanguage();
 
   useEffect(() => {
-    fetch(`/api/stats/visits?period=${period}`)
+    fetch(`/api/stats?endpoint=visits&period=${period}`)
       .then(res => res.json())
       .then(data => {
         if (!data || !data.byTime) return;

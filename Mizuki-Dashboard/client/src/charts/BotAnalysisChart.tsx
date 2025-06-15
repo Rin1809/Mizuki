@@ -12,7 +12,7 @@ const BotAnalysisChart = () => {
     const { t } = useLanguage();
 
     useEffect(() => {
-        fetch('/api/stats/bot-analysis')
+        fetch('/api/stats?endpoint=bot-analysis')
             .then(res => res.json())
             .then(data => {
                 if (!data || !data.botDistribution) return;

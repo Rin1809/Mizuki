@@ -12,7 +12,7 @@ const SessionDurationChart = () => {
     const { t, locale } = useLanguage();
 
     useEffect(() => {
-        fetch('/api/stats/session-duration')
+        fetch('/api/stats?endpoint=session-duration')
             .then(res => res.json())
             .then(data => {
                 if (!data || !data.sessionDurations) return;

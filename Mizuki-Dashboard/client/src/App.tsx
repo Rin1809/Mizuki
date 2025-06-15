@@ -55,7 +55,7 @@ function App() {
   const { t, locale, setLocale } = useLanguage();
 
   useEffect(() => {
-    fetch('/api/stats/overview')
+    fetch('/api/stats?endpoint=overview')
       .then(res => res.json())
       .then(data => setOverview(data))
       .catch(err => console.error("Loi lay overview:", err));

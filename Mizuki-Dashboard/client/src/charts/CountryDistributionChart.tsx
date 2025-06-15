@@ -15,7 +15,7 @@ const CountryDistributionChart = () => {
     const { t } = useLanguage();
 
     useEffect(() => {
-        fetch('/api/stats/visits')
+        fetch('/api/stats?endpoint=visits')
             .then(res => res.json())
             .then(data => {
                 if (!data || !data.byCountry) return;

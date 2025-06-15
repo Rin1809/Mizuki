@@ -13,7 +13,7 @@ const VisitsByTimeOfDayPieChart = () => {
     const { t, locale } = useLanguage();
 
     useEffect(() => {
-        fetch('/api/stats/visits-by-time-of-day')
+        fetch('/api/stats?endpoint=visits-by-time-of-day')
             .then(res => res.json())
             .then(data => {
                 if (!data || !data.distribution) {

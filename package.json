@@ -1,0 +1,14 @@
+{
+  "name": "mizuki-web-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "Mizuki-Dashboard/api",
+    "Mizuki-Dashboard/client"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=Mizuki-Dashboard/api",
+    "dev:client": "npm run dev --workspace=Mizuki-Dashboard/client",
+    "install:all": "npm install"
+  }
+}

@@ -1,0 +1,74 @@
+:root {
+  --bg-color: #11111b;
+  --card-bg-color: #1a1b26;
+  --border-color: #3b3d56;
+  --text-color: #c0caf5;
+  --header-color: #bb9af7;
+  --value-color: #79e6f3;
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+.dashboard-container {
+  padding: 1.5rem 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+header h1 {
+  color: var(--header-color);
+  text-align: center;
+  font-weight: 500;
+  margin-bottom: 2.5rem;
+}
+.stats-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+.stat-card {
+  background-color: var(--card-bg-color);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  text-align: center;
+}
+.stat-card h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1.1em;
+  font-weight: 400;
+  color: var(--text-color);
+}
+.stat-card p {
+  margin: 0;
+  font-size: 2.5em;
+  font-weight: 600;
+  color: var(--value-color);
+}
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 2rem;
+}
+.chart-wrapper {
+  background-color: var(--card-bg-color);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+.chart-wrapper h2 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  font-weight: 400;
+  font-size: 1.3em;
+  color: var(--header-color);
+}
+@media (max-width: 768px) {
+  .dashboard-container { padding: 1rem; }
+  .charts-grid { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,53 @@
+import React, { useState, useEffect } from 'react';
+import { Doughnut } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartOptions } from 'chart.js';
+
+ChartJS.register(ArcElement, Tooltip, Legend);
+
+const chartColors = [
+    '#bb9af7', '#7dcfff', '#73daca', '#b9f27c', '#ff9e64',
+    '#f7768e', '#e0af68', '#9ece6a', '#c0caf5', '#2ac3de'
+];
+
+const CountryDistributionChart = () => {
+    const [chartData, setChartData] = useState<any>({ datasets: [] });
+
+    useEffect(() => {
+        fetch('/api/stats/visits')
+            .then(res => res.json())
+            .then(data => {
+                if (!data || !data.byCountry) return;
+                const labels = data.byCountry.map((d: any) => d.country);
+                const counts = data.byCountry.map((d: any) => d.count);
+                setChartData({
+                    labels,
+                    datasets: [{
+                        label: 'Lượt truy cập',
+                        data: counts,
+                        backgroundColor: chartColors.slice(0, labels.length),
+                        borderColor: '#1a1b26',
+                        borderWidth: 2,
+                    }]
+                });
+            });
+    }, []);
+
+    const options: ChartOptions<'doughnut'> = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { color: '#c0caf5' }
+        }
+      }
+    };
+
+    return (
+        <div style={{ position: 'relative', height: '400px' }}>
+            <Doughnut data={chartData} options={options} />
+        </div>
+    );
+};
+
+export default CountryDistributionChart;

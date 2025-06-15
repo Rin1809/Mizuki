@@ -1,0 +1,13 @@
+
+.env
+moitruongao/
+server_logs/
+*.log
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+.vscode/
+.idea/

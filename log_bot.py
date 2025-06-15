@@ -8,13 +8,14 @@ from datetime import datetime, timezone, timedelta
 from aiohttp import web, ClientSession 
 import hashlib 
 import re 
+import db_writer
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 ADMIN_USER_ID_STR = os.getenv('ADMIN_USER_ID', '873576591693873252')
 MIZUKI_HTTP_PORT_STR = os.getenv('MIZUKI_HTTP_PORT', os.getenv('PORT', '8080'))
 MIZUKI_EXPECTED_SECRET = os.getenv('MIZUKI_SHARED_SECRET', 'default_secret_key_for_mizuki')
-RIN_PERSONAL_CARD_API_URL = os.getenv('RIN_PERSONAL_CARD_API_URL') # lay url api
+RIN_PERSONAL_CARD_API_URL = os.getenv('RIN_PERSONAL_CARD_API_URL')
 if not RIN_PERSONAL_CARD_API_URL:
     print("[LOI CFG] RIN_PERSONAL_CARD_API_URL chưa được cấu hình trong .env của Mizuki.")
 
@@ -22,7 +23,7 @@ if not RIN_PERSONAL_CARD_API_URL:
 EXCLUDED_IPS_RAW = os.getenv('EXCLUDED_IPS', "")
 EXCLUDED_IPS = [ip.strip() for ip in EXCLUDED_IPS_RAW.split(',') if ip.strip()]
 if EXCLUDED_IPS:
-    print(f"[CFG] IP Ngoai le (ko DM): {EXCLUDED_IPS}")
+    print(f"[CFG] IP Ngoai le (ko DM/DB): {EXCLUDED_IPS}")
 
 
 COMMAND_PREFIX = "!"
@@ -159,11 +160,31 @@ async def flush_session_logs(session_key: str):
         return
 
     session_data = active_sessions.pop(session_key, None) 
-    if not session_data or not session_data.get('logs'): 
+    if not session_data:
         return
 
     user_info = session_data['user_info']
-    logs = session_data['logs']
+    
+    # Ghi vao DB
+    try:
+        events_for_db = session_data.get('events_for_db', [])
+        if events_for_db:
+            db_writer.log_interaction_session(
+                session_key,
+                user_info['ip'],
+                user_info['userAgent'],
+                user_info['location'],
+                user_info['first_server_timestamp'],
+                user_info['last_activity_timestamp'],
+                events_for_db
+            )
+    except Exception as db_e:
+        print(f"[FLUSH][DB_LOI] Khong ghi duoc session {session_key}: {db_e}")
+
+    # Gui DM
+    logs_for_dm = session_data.get('logs_for_dm')
+    if not logs_for_dm:
+        return
 
     admin_user = await client.fetch_user(ADMIN_USER_ID)
     if not admin_user:
@@ -180,7 +201,7 @@ async def flush_session_logs(session_key: str):
     embed.add_field(name="📍 Vị trí", value=user_info['location'], inline=False)
     
     action_details = ""
-    for log_entry in logs:
+    for log_entry in logs_for_dm:
         action_details += f"[`{log_entry['time']}`] {log_entry['action_text']}\n"
     
     MAX_FIELD_VALUE_LENGTH = 1020 
@@ -239,6 +260,12 @@ async def handle_notify_visit(request: web.Request):
         timestamp_iso_utc = data.get("timestamp", datetime.now(timezone.utc).isoformat())
         timestamp_formatted_hcm = format_timestamp_hcm(timestamp_iso_utc)
         
+        # ghi db
+        try:
+            db_writer.log_visit(ip, user_agent, country, city, region, isp, timestamp_iso_utc)
+        except Exception as db_e:
+            print(f"[VISIT][DB_LOI] Khong ghi duoc vao DB: {db_e}")
+
         admin_user = await client.fetch_user(ADMIN_USER_ID)
         if admin_user:
             embed = discord.Embed(
@@ -325,27 +352,40 @@ async def handle_log_interaction(request: web.Request):
                 details_json_str = details_json_str[:100] + "..."
             action_text = f"Event: `{event_type}` Data: `{details_json_str}`"
 
+        # data cho dm
+        log_entry_dm = {'time': client_time_hcm_short, 'action_text': action_text}
+        
+        # data cho db
+        db_log_entry = {
+            'event_time': client_timestamp_iso_utc,
+            'event_type': event_type,
+            'details': json.dumps(event_data)
+        }
 
-        log_entry = {'time': client_time_hcm_short, 'action_text': action_text}
-
+        now_utc = datetime.now(timezone.utc)
         if session_key not in active_sessions:
             location = data.get("location", "Không rõ") 
             active_sessions[session_key] = {
-                'logs': [log_entry],
-                'last_activity': datetime.now(timezone.utc),
+                'logs_for_dm': [log_entry_dm],
+                'events_for_db': [db_log_entry],
+                'last_activity': now_utc,
                 'user_info': {
                     'ip': ip,
                     'location': location,
                     'userAgent': user_agent,
                     'first_client_time_hcm': client_time_hcm_full,
-                    'first_server_timestamp': server_timestamp_iso_utc
+                    'first_server_timestamp': server_timestamp_iso_utc,
+                    'last_activity_timestamp': server_timestamp_iso_utc
                 }
             }
         else:
-            active_sessions[session_key]['logs'].append(log_entry)
-            active_sessions[session_key]['last_activity'] = datetime.now(timezone.utc)
+            active_sessions[session_key]['logs_for_dm'].append(log_entry_dm)
+            active_sessions[session_key]['events_for_db'].append(db_log_entry)
+            active_sessions[session_key]['last_activity'] = now_utc
+            active_sessions[session_key]['user_info']['last_activity_timestamp'] = server_timestamp_iso_utc
 
-        if len(active_sessions[session_key]['logs']) >= LOG_BUFFER_LIMIT:
+
+        if len(active_sessions[session_key]['logs_for_dm']) >= LOG_BUFFER_LIMIT:
             await flush_session_logs(session_key)
 
         return web.Response(text="Interaction event received.", status=200)
@@ -375,8 +415,6 @@ async def setup_http_server():
          print(f"[HTTP][LOI] Ko start server port {effective_port}: {e}")
          print("[HTTP][WARN] Bot chay ko co HTTP server.")
 
-
-# xu ly lenh blog
 async def handle_blog_command(message: discord.Message, command_content: str):
     if message.author.id != ADMIN_USER_ID:
         await send_dm_safe(message.channel, "⚠️ Bạn không có quyền đăng blog.", context_log="BlogPermDenied")
@@ -397,7 +435,7 @@ async def handle_blog_command(message: discord.Message, command_content: str):
         else:
             await send_dm_safe(message.channel, "⚠️ File đính kèm không phải là hình ảnh hợp lệ.", context_log="BlogInvalidAttachment")
     
-    blog_content = None # hien tai ko co content
+    blog_content = None
 
     blog_post_data = {
         "title": title,
@@ -442,6 +480,12 @@ async def on_ready():
     else:
         print(">>> Bot san sang nhan DM tu Admin! <<<")
         try:
+            # khoi tao db dashboard
+            if os.getenv('DATABASE_URL_DASHBOARD'):
+                db_writer.initialize_database()
+            else:
+                print("[WARN] DATABASE_URL_DASHBOARD chua dc cau hinh. Se ko ghi log thong ke.")
+            
             await setup_http_server()
             client.loop.create_task(periodic_log_flusher())
             print("📝 Log flusher da khoi dong.")

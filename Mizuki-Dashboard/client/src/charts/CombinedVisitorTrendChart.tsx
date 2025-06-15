@@ -51,7 +51,7 @@ const CombinedVisitorTrendChart = () => {
             yAxisID: 'yBreakdown',
             tension: 0.4,
             borderWidth: 2,
-            fill: true,
+            fill: false,
             pointRadius: 2,
             pointBackgroundColor: '#73daca',
             pointHoverRadius: 5,
@@ -64,7 +64,7 @@ const CombinedVisitorTrendChart = () => {
             yAxisID: 'yBreakdown',
             tension: 0.4,
             borderWidth: 2,
-            fill: true,
+            fill: false,
             pointRadius: 2,
             pointBackgroundColor: '#bb9af7',
             pointHoverRadius: 5,
@@ -74,7 +74,7 @@ const CombinedVisitorTrendChart = () => {
       setLoading(false);
     })
     .catch(error => {
-        console.error("Loi khi fetch combined trend data:", error);
+        console.error("Loi fetch combined trend:", error);
         setLoading(false);
     });
   }, []);

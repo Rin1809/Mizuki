@@ -1,4 +1,3 @@
-// Mizuki-Dashboard/client/src/charts/LanguageChart.tsx
 import { useState, useEffect } from 'react';
 import { Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartOptions } from 'chart.js';
@@ -22,7 +21,7 @@ const LanguageChart = () => {
                     datasets: [{
                         label: 'Số lần chọn',
                         data: counts,
-                        backgroundColor: ['#e0af68', '#7dcfff'],
+                        backgroundColor: ['#e0af68', '#7dcfff', '#bb9af7', '#73daca'],
                         borderColor: '#1a1b26',
                         borderWidth: 2,
                     }]

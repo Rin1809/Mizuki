@@ -1,4 +1,3 @@
-// Mizuki-Dashboard/client/src/charts/SessionDurationChart.tsx
 import { useState, useEffect } from 'react';
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartOptions } from 'chart.js';

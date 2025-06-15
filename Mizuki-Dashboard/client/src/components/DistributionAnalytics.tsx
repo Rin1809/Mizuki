@@ -1,4 +1,3 @@
-// Mizuki-Dashboard/client/src/components/DistributionAnalytics.tsx
 import { useState } from "react";
 import CountryDistributionChart from "@/charts/CountryDistributionChart";
 import VisitorDistributionPieChart from "@/charts/VisitorDistributionPieChart";
@@ -25,7 +24,7 @@ const DistributionAnalytics = () => {
     }
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className="analytics-wrapper">
             <div className="view-switcher">
                 <button onClick={() => setView('loyalty')} className={view === 'loyalty' ? 'active' : ''}>
                     Mức Độ Quay Lại

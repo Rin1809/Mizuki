@@ -3,13 +3,23 @@ import React from 'react';
 interface StatCardProps {
   title: string;
   value: number | string | undefined;
+  unit?: string;
+  icon: React.ReactNode;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value }) => (
-  <div className="stat-card">
-    <h3>{title}</h3>
-    <p>{value?.toLocaleString('vi-VN') ?? '...'}</p>
-  </div>
-);
+function StatCard({ title, value, unit, icon }: StatCardProps) {
+  return (
+    <div className="stat-card">
+      <div className="stat-card-icon">{icon}</div>
+      <div className="stat-card-info">
+        <p className="stat-card-title">{title}</p>
+        <p className="stat-card-value">
+          {value?.toLocaleString('vi-VN') ?? '...'}
+          {unit && <span className="stat-unit">{unit}</span>}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default StatCard;

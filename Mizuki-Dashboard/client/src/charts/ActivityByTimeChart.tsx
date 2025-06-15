@@ -1,85 +1,92 @@
-// Mizuki-Dashboard/client/src/charts/ActivityByTimeChart.tsx
 import { useState, useEffect } from 'react';
-import { Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions } from 'chart.js';
+import { Bubble } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, Tooltip, Legend, ChartOptions, BubbleController, ChartDataset } from 'chart.js';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, Tooltip, Legend, BubbleController);
 
-type ViewMode = 'hourly' | 'daily';
+const dayLabels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
+const hourLabels = Array.from({ length: 24 }, (_, i) => `${i}h`);
 
-const dayLabels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
-
-const ActivityByTimeChart = () => {
-    const [view, setView] = useState<ViewMode>('hourly');
+const ActivityHeatmapChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
     const [loading, setLoading] = useState(true);
-    const [apiData, setApiData] = useState<any>(null);
 
     useEffect(() => {
         fetch('/api/stats/activity-by-time')
             .then(res => res.json())
             .then(data => {
-                setApiData(data);
+                if (!data.heatmapData) {
+                    setLoading(false);
+                    return;
+                }
+
+                const maxCount = Math.max(...data.heatmapData.map((d: any) => d.count), 0);
+
+                const bubbleData = data.heatmapData.map((item: any) => ({
+                    x: item.hour_of_day,
+                    y: item.day_of_week - 1,
+                    v: item.count,
+                    r: Math.max(5, (item.count / (maxCount || 1)) * 20),
+                }));
+
+                const dataset: ChartDataset<'bubble'> = {
+                    label: 'Lượt truy cập',
+                    data: bubbleData,
+                    backgroundColor: 'rgba(158, 206, 106, 0.7)',
+                    borderColor: '#9ece6a',
+                    borderWidth: 1,
+                };
+                
+                setChartData({
+                    labels: hourLabels,
+                    datasets: [dataset]
+                });
                 setLoading(false);
             });
     }, []);
 
-    useEffect(() => {
-        if (!apiData) return;
-
-        const hourlyLabels = Array.from({ length: 24 }, (_, i) => `${i}:00`);
-        const hourlyCounts = Array(24).fill(0);
-        apiData.byHour.forEach((item: any) => {
-            hourlyCounts[item.hour] = item.count;
-        });
-
-        const dailyCounts = Array(7).fill(0);
-        apiData.byDayOfWeek.forEach((item: any) => {
-            dailyCounts[item.day_of_week - 1] = item.count;
-        });
-
-        const dataMap = {
-            hourly: { labels: hourlyLabels, counts: hourlyCounts, label: 'Lượt truy cập theo giờ' },
-            daily: { labels: dayLabels, counts: dailyCounts, label: 'Lượt truy cập theo ngày' }
-        };
-
-        const currentData = dataMap[view];
-        setChartData({
-            labels: currentData.labels,
-            datasets: [{
-                label: currentData.label,
-                data: currentData.counts,
-                backgroundColor: '#9ece6a',
-                borderColor: '#7a9c51',
-                borderWidth: 1,
-            }]
-        });
-
-    }, [view, apiData]);
-
-    const options: ChartOptions<'bar'> = {
+    const options: ChartOptions<'bubble'> = {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-            x: { ticks: { color: '#c0caf5' }, grid: { color: 'rgba(192, 202, 245, 0.1)' } },
-            y: { ticks: { color: '#c0caf5', stepSize: 1 }, grid: { color: 'rgba(192, 202, 245, 0.1)' } }
+            x: {
+                type: 'category',
+                labels: hourLabels,
+                ticks: { color: '#c0caf5', autoSkip: true, maxTicksLimit: 12 },
+                grid: { color: 'rgba(192, 202, 245, 0.05)' },
+                title: { display: true, text: 'Giờ trong ngày', color: '#c0caf5' }
+            },
+            y: {
+                type: 'category',
+                labels: dayLabels,
+                offset: true,
+                ticks: { color: '#c0caf5' },
+                grid: { color: 'rgba(192, 202, 245, 0.1)' },
+                title: { display: true, text: 'Ngày trong tuần', color: '#c0caf5' }
+            }
         },
-        plugins: { legend: { display: false } }
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context: any) {
+                        const day = dayLabels[context.raw.y];
+                        const hour = `${context.raw.x}h - ${context.raw.x + 1}h`;
+                        const count = context.raw.v;
+                        return `${day}, ${hour}: ${count} lượt`;
+                    }
+                }
+            }
+        }
     };
 
     if (loading) return <p>Đang tải...</p>;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <div className="view-switcher" style={{ marginTop: '-10px', marginBottom: '20px' }}>
-                <button onClick={() => setView('hourly')} className={view === 'hourly' ? 'active small' : 'small'}>Theo Giờ</button>
-                <button onClick={() => setView('daily')} className={view === 'daily' ? 'active small' : 'small'}>Theo Ngày</button>
-            </div>
-            <div className="analytics-content">
-                <Bar data={chartData} options={options} />
-            </div>
+        <div className="analytics-content">
+            <Bubble data={chartData} options={options} />
         </div>
     );
 };
 
-export default ActivityByTimeChart;
+export default ActivityHeatmapChart;

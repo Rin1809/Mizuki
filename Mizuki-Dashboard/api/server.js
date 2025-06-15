@@ -14,11 +14,13 @@ const sessionDurationHandler = require('./stats/session-duration.js');
 const platformDistributionHandler = require('./stats/platform-distribution.js');
 const activityByTimeHandler = require('./stats/activity-by-time.js');
 const languageDistributionHandler = require('./stats/language-distribution.js');
-// them handler moi
 const cityDistributionHandler = require('./stats/city-distribution.js');
 const detailedInteractionsHandler = require('./stats/detailed-interactions.js');
 const botAnalysisHandler = require('./stats/bot-analysis.js');
-
+const liveVisitorsHandler = require('./stats/live-visitors.js');
+const bounceRateTrendsHandler = require('./stats/bounce-rate-trends.js');
+const visitsByTimeOfDayHandler = require('./stats/visits-by-time-of-day.js');
+const visitsByHourHandler = require('./stats/visits-by-hour.js'); // api moi
 
 dotenv.config({ path: '../.env' });
 
@@ -35,6 +37,7 @@ const run = (handler) => (req, res) => {
     handler(req, res);
 };
 
+// Route
 app.get('/api/stats/overview', run(overviewHandler));
 app.get('/api/stats/visits', run(visitsHandler));
 app.get('/api/stats/interactions', run(interactionsHandler));
@@ -46,10 +49,13 @@ app.get('/api/stats/session-duration', run(sessionDurationHandler));
 app.get('/api/stats/platform-distribution', run(platformDistributionHandler));
 app.get('/api/stats/activity-by-time', run(activityByTimeHandler));
 app.get('/api/stats/language-distribution', run(languageDistributionHandler));
-// them route moi
 app.get('/api/stats/city-distribution', run(cityDistributionHandler));
 app.get('/api/stats/detailed-interactions', run(detailedInteractionsHandler));
 app.get('/api/stats/bot-analysis', run(botAnalysisHandler));
+app.get('/api/stats/live-visitors', run(liveVisitorsHandler));
+app.get('/api/stats/bounce-rate-trends', run(bounceRateTrendsHandler));
+app.get('/api/stats/visits-by-time-of-day', run(visitsByTimeOfDayHandler));
+app.get('/api/stats/visits-by-hour', run(visitsByHourHandler)); // route moi
 
 app.get('/', (req, res) => {
   res.send('Mizuki Dashboard API Server (Local) is running! ✨');

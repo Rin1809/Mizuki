@@ -1,4 +1,3 @@
-// Mizuki-Dashboard/client/src/components/PlatformAnalytics.tsx
 import { useState, useEffect } from "react";
 import { Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartOptions } from 'chart.js';
@@ -59,7 +58,7 @@ const PlatformAnalytics = () => {
     if (loading) return <p>Đang tải...</p>;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className="analytics-wrapper">
             <div className="view-switcher">
                 <button onClick={() => setView('browser')} className={view === 'browser' ? 'active' : ''}>
                     Theo Trình Duyệt

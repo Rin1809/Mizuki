@@ -3,32 +3,23 @@ const { pool } = require('../_lib/db.js');
 
 module.exports = async (req, res) => {
     try {
-        // Lấy dữ liệu theo giờ trong ngày (timezone Việt Nam)
-        const byHourRes = await pool.query(`
+        // lay data theo tung gio cua tung ngay trong tuan
+        const heatmapRes = await pool.query(`
             SELECT 
-                EXTRACT(HOUR FROM visit_time AT TIME ZONE 'Asia/Ho_Chi_Minh') as hour,
+                EXTRACT(ISODOW FROM visit_time AT TIME ZONE 'Asia/Ho_Chi_Minh') as day_of_week, -- 1=T2, 7=CN
+                EXTRACT(HOUR FROM visit_time AT TIME ZONE 'Asia/Ho_Chi_Minh') as hour_of_day,
                 COUNT(*) as count
             FROM visits
-            GROUP BY hour
-            ORDER BY hour ASC;
-        `);
-
-        // Lấy dữ liệu theo ngày trong tuần (timezone Việt Nam, 1=T2, 7=CN)
-        const byDayOfWeekRes = await pool.query(`
-            SELECT 
-                EXTRACT(ISODOW FROM visit_time AT TIME ZONE 'Asia/Ho_Chi_Minh') as day_of_week,
-                COUNT(*) as count
-            FROM visits
-            GROUP BY day_of_week
-            ORDER BY day_of_week ASC;
+            WHERE visit_time > NOW() - INTERVAL '30 day'
+            GROUP BY day_of_week, hour_of_day
+            ORDER BY day_of_week, hour_of_day;
         `);
 
         res.status(200).json({
-            byHour: byHourRes.rows,
-            byDayOfWeek: byDayOfWeekRes.rows,
+            heatmapData: heatmapRes.rows,
         });
     } catch (error) {
-        console.error('API Activity By Time Error:', error);
-        res.status(500).json({ error: 'Loi lay data hoat dong theo thoi gian.' });
+        console.error('API Activity By Time (Heatmap) Error:', error);
+        res.status(500).json({ error: 'Loi lay data hoat dong cho heatmap.' });
     }
 };

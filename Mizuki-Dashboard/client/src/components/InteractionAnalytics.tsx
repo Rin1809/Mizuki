@@ -1,4 +1,3 @@
-// Mizuki-Dashboard/client/src/components/InteractionAnalytics.tsx
 import { useState } from "react";
 import InteractionTypesChart from "@/charts/InteractionTypesChart";
 import ViewDistributionChart from "@/charts/ViewDistributionChart";
@@ -25,7 +24,7 @@ const InteractionAnalytics = () => {
     }
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className="analytics-wrapper">
             <div className="view-switcher">
                 <button onClick={() => setView('type')} className={view === 'type' ? 'active' : ''}>
                     Loại Tương Tác

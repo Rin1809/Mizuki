@@ -1,4 +1,3 @@
-// Mizuki-Dashboard/client/src/components/VisitorAnalytics.tsx
 import { useState } from "react";
 import TopVisitorsTable from "./TopVisitorsTable";
 import VisitorTrendChart from "@/charts/VisitorTrendChart";
@@ -22,7 +21,7 @@ const VisitorAnalytics = () => {
     }
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className="analytics-wrapper">
             <div className="view-switcher">
                 <button onClick={() => setView('pie')} className={view === 'pie' ? 'active' : ''}>
                     Phân Bố IP

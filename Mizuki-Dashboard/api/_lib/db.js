@@ -1,8 +1,6 @@
-// api/_lib/db.js
-import pg from 'pg';
-import dotenv from 'dotenv';
+const pg = require('pg');
+const dotenv = require('dotenv');
 
-// tim file .env o thu muc cha (Mizuki-Dashboard)
 dotenv.config({ path: '../.env' }); 
 
 const { Pool } = pg;
@@ -26,4 +24,4 @@ pool.on('error', (err, client) => {
   console.error('DB_POOL_ERROR: Loi bat ngo', { error: err.message });
 });
 
-export { pool };
+module.exports = { pool };

@@ -1,11 +1,12 @@
-// Mizuki-Dashboard/client/src/components/DetailedInteractionAnalytics.tsx
 import { useState } from "react";
 import DetailedInteractionChart from "@/charts/DetailedInteractionChart";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type ViewMode = 'about' | 'gallery' | 'guestbook';
 
 const DetailedInteractionAnalytics = () => {
     const [view, setView] = useState<ViewMode>('about');
+    const { t } = useLanguage();
 
     const renderView = () => {
         switch (view) {
@@ -23,13 +24,13 @@ const DetailedInteractionAnalytics = () => {
         <div>
             <div className="view-switcher">
                 <button onClick={() => setView('about')} className={view === 'about' ? 'active' : ''}>
-                    Mục About
+                    {t('buttons.aboutSection')}
                 </button>
                 <button onClick={() => setView('gallery')} className={view === 'gallery' ? 'active' : ''}>
-                    Ảnh Gallery
+                    {t('buttons.galleryPhotos')}
                 </button>
                 <button onClick={() => setView('guestbook')} className={view === 'guestbook' ? 'active' : ''}>
-                    Guestbook
+                    {t('buttons.guestbook')}
                 </button>
             </div>
             <div className="analytics-content">

@@ -1,12 +1,13 @@
-// Mizuki-Dashboard/client/src/charts/InteractionTypesChart.tsx
 import { useState, useEffect } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions } from 'chart.js';
+import { useLanguage } from '@/hooks/useLanguage';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const InteractionTypesChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
+    const { t } = useLanguage();
 
     useEffect(() => {
         fetch('/api/stats/interactions')
@@ -18,7 +19,7 @@ const InteractionTypesChart = () => {
                 setChartData({
                     labels,
                     datasets: [{
-                        label: 'Số lần tương tác',
+                        label: t('chartLabels.interactions'),
                         data: counts,
                         backgroundColor: '#f7768e',
                         borderColor: '#bb5d6e',
@@ -26,7 +27,7 @@ const InteractionTypesChart = () => {
                     }]
                 });
             });
-    }, []);
+    }, [t]);
 
     const options: ChartOptions<'bar'> = {
       responsive: true,

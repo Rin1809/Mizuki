@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartOptions } from 'chart.js';
+import { useLanguage } from '@/hooks/useLanguage';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const LanguageChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
+    const { t } = useLanguage();
 
     useEffect(() => {
         fetch('/api/stats/language-distribution')
@@ -19,7 +21,7 @@ const LanguageChart = () => {
                 setChartData({
                     labels,
                     datasets: [{
-                        label: 'Số lần chọn',
+                        label: t('chartLabels.languageSelection'),
                         data: counts,
                         backgroundColor: ['#e0af68', '#7dcfff', '#bb9af7', '#73daca'],
                         borderColor: '#1a1b26',
@@ -27,7 +29,7 @@ const LanguageChart = () => {
                     }]
                 });
             });
-    }, []);
+    }, [t]);
 
     const options: ChartOptions<'pie'> = {
         responsive: true,

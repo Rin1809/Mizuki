@@ -3,11 +3,13 @@ import InteractionTypesChart from "@/charts/InteractionTypesChart";
 import ViewDistributionChart from "@/charts/ViewDistributionChart";
 import SessionDurationChart from "@/charts/SessionDurationChart";
 import LanguageChart from "@/charts/LanguageChart";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type ViewMode = 'type' | 'page_view' | 'duration' | 'language';
 
 const InteractionAnalytics = () => {
     const [view, setView] = useState<ViewMode>('type');
+    const { t } = useLanguage();
 
     const renderView = () => {
         switch (view) {
@@ -27,16 +29,16 @@ const InteractionAnalytics = () => {
         <div className="analytics-wrapper">
             <div className="view-switcher">
                 <button onClick={() => setView('type')} className={view === 'type' ? 'active' : ''}>
-                    Loại Tương Tác
+                    {t('buttons.interactionType')}
                 </button>
                 <button onClick={() => setView('page_view')} className={view === 'page_view' ? 'active' : ''}>
-                    Lượt Xem Trang
+                    {t('buttons.pageViews')}
                 </button>
                 <button onClick={() => setView('duration')} className={view === 'duration' ? 'active' : ''}>
-                    Thời Lượng Phiên
+                    {t('buttons.sessionDuration')}
                 </button>
                 <button onClick={() => setView('language')} className={view === 'language' ? 'active' : ''}>
-                    Ngôn Ngữ
+                    {t('buttons.language')}
                 </button>
             </div>
             <div className="analytics-content">

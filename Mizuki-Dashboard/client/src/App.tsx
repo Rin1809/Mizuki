@@ -11,6 +11,8 @@ import DetailedInteractionAnalytics from './components/DetailedInteractionAnalyt
 import BotAnalysisChart from './charts/BotAnalysisChart';
 import LiveStat from './components/LiveStat';
 import BounceRateTrendChart from './charts/BounceRateTrendChart';
+import { useLanguage } from './hooks/useLanguage';
+import { Locale } from './lib/translations';
 
 interface OverviewStats {
   totalVisits: number;
@@ -50,6 +52,7 @@ const BounceIcon = () => (
 
 function App() {
   const [overview, setOverview] = useState<OverviewStats | null>(null);
+  const { t, locale, setLocale } = useLanguage();
 
   useEffect(() => {
     fetch('/api/stats/overview')
@@ -62,71 +65,78 @@ function App() {
     <div className="dashboard-container">
       <header>
         <div className="header-content">
-          <div className="header-title">
-            <img src="/icon.ico" alt="Mizuki Icon" className="header-icon" />
-            <h1>Rin Card Analytics</h1>
+          <div className="header-left">
+            <div className="header-title">
+              <img src="/icon.ico" alt="Mizuki Icon" className="header-icon" />
+              <h1>{t('appTitle')}</h1>
+            </div>
           </div>
-          <LiveStat />
+          <div className="header-right">
+            <LiveStat />
+            <div className="language-selector">
+              <select value={locale} onChange={(e) => setLocale(e.target.value as Locale)}>
+                <option value="vi">Tiếng Việt</option>
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+              </select>
+            </div>
+          </div>
         </div>
       </header>
       <main>
         <section className="overview-grid">
-            <StatCard title="Tổng Lượt Truy Cập" value={overview?.totalVisits} icon={<EyeIcon />} />
-            <StatCard title="Khách Truy Cập" value={overview?.uniqueVisitors} icon={<UsersIcon />} />
-            <StatCard title="Tổng Tương Tác" value={overview?.totalInteractions} icon={<InteractionIcon />} />
-            <StatCard title="Thời Lượng Phiên (TB)" value={overview?.avgSessionDuration} unit="s" icon={<ClockIcon />} />
-            <StatCard title="Tỷ Lệ Thoát" value={overview?.bounceRate} unit="%" icon={<BounceIcon />} />
+          <StatCard title={t('overview.totalVisits')} value={overview?.totalVisits} icon={<EyeIcon />} />
+          <StatCard title={t('overview.uniqueVisitors')} value={overview?.uniqueVisitors} icon={<UsersIcon />} />
+          <StatCard title={t('overview.totalInteractions')} value={overview?.totalInteractions} icon={<InteractionIcon />} />
+          <StatCard title={t('overview.avgSessionDuration')} value={overview?.avgSessionDuration} unit={t('overview.unitSeconds')} icon={<ClockIcon />} />
+          <StatCard title={t('overview.bounceRate')} value={overview?.bounceRate} unit="%" icon={<BounceIcon />} />
         </section>
         
-        <section className="charts-grid">
-          <div className="chart-wrapper">
-            <h2>Phân Tích Khách Truy Cập</h2>
-            <VisitorAnalytics />
+        <div className="main-content">
+          <div className="main-column">
+            <div className="chart-wrapper">
+              <h2>{t('charts.timeAnalytics')}</h2>
+              <TimeAnalytics />
+            </div>
+            <div className="chart-wrapper">
+              <h2>{t('charts.visitorAnalytics')}</h2>
+              <VisitorAnalytics />
+            </div>
+             <div className="chart-wrapper">
+              <h2>{t('charts.activityHeatmap')}</h2>
+              <ActivityByTimeChart />
+            </div>
+            <div className="chart-wrapper">
+              <h2>{t('charts.bounceRateTrend')}</h2>
+              <BounceRateTrendChart />
+            </div>
           </div>
-
-          <div className="chart-wrapper">
-            <h2>Phân Tích Theo Thời Gian</h2>
-            <TimeAnalytics />
+          <div className="sidebar-column">
+            <div className="chart-wrapper">
+              <h2>{t('charts.interactionAnalytics')}</h2>
+              <InteractionAnalytics />
+            </div>
+            <div className="chart-wrapper">
+              <h2>{t('charts.platformAnalytics')}</h2>
+              <PlatformAnalytics />
+            </div>
+            <div className="chart-wrapper">
+              <h2>{t('charts.geoNetworkAnalytics')}</h2>
+              <DistributionAnalytics />
+            </div>
+            <div className="chart-wrapper">
+              <h2>{t('charts.detailedInteractions')}</h2>
+              <DetailedInteractionAnalytics />
+            </div>
+            <div className="chart-wrapper">
+              <h2>{t('charts.botAnalysis')}</h2>
+              <BotAnalysisChart />
+            </div>
           </div>
-
-          <div className="chart-wrapper">
-            <h2>Phân Tích Tương Tác</h2>
-            <InteractionAnalytics />
-          </div>
-
-          <div className="chart-wrapper">
-            <h2>Phân Bố Địa Lý & Mạng</h2>
-            <DistributionAnalytics />
-          </div>
-          
-          <div className="chart-wrapper">
-            <h2>Phân Tích Nền Tảng</h2>
-            <PlatformAnalytics />
-          </div>
-          
-          <div className="chart-wrapper">
-            <h2>Heatmap Hoạt Động (30 ngày qua)</h2>
-            <ActivityByTimeChart />
-          </div>
-
-           <div className="chart-wrapper">
-            <h2>Tương Tác Chi Tiết</h2>
-            <DetailedInteractionAnalytics />
-          </div>
-
-          <div className="chart-wrapper">
-            <h2>Phân Tích Bot / Crawler</h2>
-            <BotAnalysisChart />
-          </div>
-          
-          <div className="chart-wrapper">
-            <h2>Xu Hướng Tỷ Lệ Thoát</h2>
-            <BounceRateTrendChart />
-          </div>
-        </section>
+        </div>
       </main>
       <footer>
-        <p>Mizuki Analytics Dashboard</p>
+        <p>{t('footer')}</p>
       </footer>
     </div>
   );

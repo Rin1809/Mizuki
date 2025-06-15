@@ -1,7 +1,7 @@
-// Mizuki-Dashboard/client/src/charts/BotAnalysisChart.tsx
 import { useState, useEffect } from 'react';
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartOptions } from 'chart.js';
+import { useLanguage } from '@/hooks/useLanguage';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -9,6 +9,7 @@ const chartColors = ['#f7768e', '#ff9e64', '#e0af68', '#b9f27c', '#73daca', '#7d
 
 const BotAnalysisChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
+    const { t } = useLanguage();
 
     useEffect(() => {
         fetch('/api/stats/bot-analysis')
@@ -20,7 +21,7 @@ const BotAnalysisChart = () => {
                 setChartData({
                     labels,
                     datasets: [{
-                        label: 'Lượt truy cập',
+                        label: t('chartLabels.visits'),
                         data: counts,
                         backgroundColor: chartColors,
                         borderColor: '#1a1b26',
@@ -28,7 +29,7 @@ const BotAnalysisChart = () => {
                     }]
                 });
             });
-    }, []);
+    }, [t]);
 
     const options: ChartOptions<'doughnut'> = {
       responsive: true,

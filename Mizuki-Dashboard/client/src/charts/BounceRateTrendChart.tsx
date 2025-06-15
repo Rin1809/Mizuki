@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, ChartOptions, Filler } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import { vi } from 'date-fns/locale';
+import { useLanguage } from '@/hooks/useLanguage';
+import { dateLocales } from '@/lib/dateLocales';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, Filler);
 
 const BounceRateTrendChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
     const [loading, setLoading] = useState(true);
+    const { t, locale } = useLanguage();
 
     useEffect(() => {
         fetch('/api/stats/bounce-rate-trends')
@@ -25,7 +27,7 @@ const BounceRateTrendChart = () => {
                 setChartData({
                     labels,
                     datasets: [{
-                        label: 'Tỷ lệ thoát',
+                        label: t('chartLabels.bounceRate'),
                         data: rates,
                         borderColor: '#f7768e',
                         backgroundColor: 'rgba(247, 118, 142, 0.25)',
@@ -43,7 +45,7 @@ const BounceRateTrendChart = () => {
                 console.error("Loi khi fetch bounce rate trends:", error);
                 setLoading(false);
             });
-    }, []);
+    }, [t]);
 
     const options: ChartOptions<'line'> = {
         responsive: true,
@@ -52,7 +54,7 @@ const BounceRateTrendChart = () => {
             x: {
                 type: 'time',
                 time: { unit: 'day' },
-                adapters: { date: { locale: vi } },
+                adapters: { date: { locale: dateLocales[locale] } },
                 ticks: { color: '#c0caf5' },
                 grid: { color: 'rgba(192, 202, 245, 0.1)' }
             },
@@ -86,7 +88,7 @@ const BounceRateTrendChart = () => {
         }
     };
 
-    if (loading) return <p>Đang tải dữ liệu...</p>;
+    if (loading) return <p>{t('loading')}</p>;
 
     return (
         <div className="chart-container">

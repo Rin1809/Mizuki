@@ -2,11 +2,13 @@ import { useState } from "react";
 import TopVisitorsTable from "./TopVisitorsTable";
 import VisitorTrendChart from "@/charts/VisitorTrendChart";
 import TopIPDistributionChart from "@/charts/TopIPDistributionChart";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type ViewMode = 'pie' | 'trend' | 'table';
 
 const VisitorAnalytics = () => {
     const [view, setView] = useState<ViewMode>('pie');
+    const { t } = useLanguage();
 
     const renderView = () => {
         switch (view) {
@@ -24,13 +26,13 @@ const VisitorAnalytics = () => {
         <div className="analytics-wrapper">
             <div className="view-switcher">
                 <button onClick={() => setView('pie')} className={view === 'pie' ? 'active' : ''}>
-                    Phân Bố IP
+                    {t('buttons.ipDistribution')}
                 </button>
                 <button onClick={() => setView('trend')} className={view === 'trend' ? 'active' : ''}>
-                    Xu Hướng
+                    {t('buttons.trend')}
                 </button>
                 <button onClick={() => setView('table')} className={view === 'table' ? 'active' : ''}>
-                    Xếp Hạng
+                    {t('buttons.ranking')}
                 </button>
             </div>
             <div className="analytics-content">

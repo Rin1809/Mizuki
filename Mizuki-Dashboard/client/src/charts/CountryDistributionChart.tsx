@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartOptions } from 'chart.js';
+import { useLanguage } from '@/hooks/useLanguage';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -11,6 +12,7 @@ const chartColors = [
 
 const CountryDistributionChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
+    const { t } = useLanguage();
 
     useEffect(() => {
         fetch('/api/stats/visits')
@@ -22,7 +24,7 @@ const CountryDistributionChart = () => {
                 setChartData({
                     labels,
                     datasets: [{
-                        label: 'Lượt truy cập',
+                        label: t('chartLabels.visits'),
                         data: counts,
                         backgroundColor: chartColors.slice(0, labels.length),
                         borderColor: '#1a1b26',
@@ -30,7 +32,7 @@ const CountryDistributionChart = () => {
                     }]
                 });
             });
-    }, []);
+    }, [t]);
 
     const options: ChartOptions<'doughnut'> = {
       responsive: true,

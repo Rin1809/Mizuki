@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions } from 'chart.js';
+import { useLanguage } from '@/hooks/useLanguage';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const ViewDistributionChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
+    const { t } = useLanguage();
 
     useEffect(() => {
         fetch('/api/stats/interactions')
@@ -19,7 +21,7 @@ const ViewDistributionChart = () => {
                 setChartData({
                     labels,
                     datasets: [{
-                        label: 'Số lượt xem',
+                        label: t('chartLabels.views'),
                         data: counts,
                         backgroundColor: '#73daca',
                         borderColor: '#5aab9d',
@@ -27,7 +29,7 @@ const ViewDistributionChart = () => {
                     }]
                 });
             });
-    }, []);
+    }, [t]);
 
     const options: ChartOptions<'bar'> = {
       responsive: true,

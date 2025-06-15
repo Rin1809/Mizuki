@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, ChartOptions, Filler } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import { vi } from 'date-fns/locale';
+import { useLanguage } from '@/hooks/useLanguage';
+import { dateLocales } from '@/lib/dateLocales';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, Filler);
 
 const CombinedVisitorTrendChart = () => {
   const [chartData, setChartData] = useState<any>({ datasets: [] });
   const [loading, setLoading] = useState(true);
+  const { t, locale } = useLanguage();
 
   useEffect(() => {
     Promise.all([
@@ -31,7 +33,7 @@ const CombinedVisitorTrendChart = () => {
         labels,
         datasets: [
           {
-            label: 'Tổng lượt truy cập',
+            label: t('chartLabels.totalVisits'),
             data: totalVisits,
             borderColor: '#7dcfff',
             backgroundColor: 'rgba(125, 207, 255, 0.2)',
@@ -44,7 +46,7 @@ const CombinedVisitorTrendChart = () => {
             pointHoverRadius: 5,
           },
           {
-            label: 'Khách mới',
+            label: t('chartLabels.newVisitors'),
             data: newVisitors,
             borderColor: '#73daca',
             backgroundColor: 'rgba(115, 218, 202, 0.2)',
@@ -57,7 +59,7 @@ const CombinedVisitorTrendChart = () => {
             pointHoverRadius: 5,
           },
           {
-            label: 'Khách quay lại',
+            label: t('chartLabels.returningVisitors'),
             data: returningVisitors,
             borderColor: '#bb9af7',
             backgroundColor: 'rgba(187, 154, 247, 0.2)',
@@ -77,7 +79,7 @@ const CombinedVisitorTrendChart = () => {
         console.error("Loi fetch combined trend:", error);
         setLoading(false);
     });
-  }, []);
+  }, [t]);
 
   const options: ChartOptions<'line'> = {
     responsive: true,
@@ -90,7 +92,7 @@ const CombinedVisitorTrendChart = () => {
       x: { 
         type: 'time', 
         time: { unit: 'day' }, 
-        adapters: { date: { locale: vi } }, 
+        adapters: { date: { locale: dateLocales[locale] } }, 
         ticks: { color: '#c0caf5' },
         grid: { color: 'rgba(192, 202, 245, 0.1)' }
       },
@@ -102,7 +104,7 @@ const CombinedVisitorTrendChart = () => {
         grid: { color: 'rgba(192, 202, 245, 0.1)' },
         title: {
           display: true,
-          text: 'Tổng Lượt Truy Cập',
+          text: t('chartLabels.totalVisits'),
           color: '#7dcfff'
         }
       },
@@ -114,7 +116,7 @@ const CombinedVisitorTrendChart = () => {
         grid: { drawOnChartArea: false },
         title: {
           display: true,
-          text: 'Phân Loại Khách',
+          text: t('buttons.analysis'),
           color: '#c0caf5'
         }
       }
@@ -134,7 +136,7 @@ const CombinedVisitorTrendChart = () => {
     }
   };
   
-  if (loading) return <p>Đang tải dữ liệu...</p>;
+  if (loading) return <p>{t('loading')}</p>;
 
   return <div className="chart-container"><Line data={chartData} options={options} /></div>;
 };

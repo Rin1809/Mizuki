@@ -3,6 +3,7 @@ import VisitsByTimeChart from "@/charts/VisitsByTimeChart";
 import CombinedVisitorTrendChart from "@/charts/CombinedVisitorTrendChart";
 import VisitsByTimeOfDayPieChart from "@/charts/VisitsByTimeOfDayPieChart";
 import VisitsByHourBarChart from "@/charts/VisitsByHourBarChart";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type ViewMode = 'overview' | 'breakdown' | 'distribution';
 type Period = 'hour' | 'day' | 'week';
@@ -12,6 +13,7 @@ const TimeAnalytics = () => {
     const [view, setView] = useState<ViewMode>('overview');
     const [period, setPeriod] = useState<Period>('hour');
     const [distributionView, setDistributionView] = useState<DistributionView>('bySession');
+    const { t } = useLanguage();
 
     const renderChart = () => {
         switch (view) {
@@ -27,42 +29,39 @@ const TimeAnalytics = () => {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Bo chuyen doi view chinh */}
             <div className="view-switcher">
                 <button onClick={() => setView('overview')} className={view === 'overview' ? 'active' : ''}>
-                    Tổng Quan
+                    {t('buttons.overview')}
                 </button>
                 <button onClick={() => setView('breakdown')} className={view === 'breakdown' ? 'active' : ''}>
-                    Phân Tích
+                    {t('buttons.analysis')}
                 </button>
                 <button onClick={() => setView('distribution')} className={view === 'distribution' ? 'active' : ''}>
-                    Phân Bố
+                    {t('buttons.distribution')}
                 </button>
             </div>
             
-            {/* Bo chuyen doi phu cho Tong Quan */}
             {view === 'overview' && (
                 <div className="view-switcher" style={{ marginTop: '-10px', marginBottom: '20px' }}>
                     <button onClick={() => setPeriod('hour')} className={period === 'hour' ? 'active small' : 'small'}>
-                        Theo Giờ
+                        {t('buttons.byTime')}
                     </button>
                     <button onClick={() => setPeriod('day')} className={period === 'day' ? 'active small' : 'small'}>
-                        Theo Ngày
+                        {t('buttons.byDay')}
                     </button>
                     <button onClick={() => setPeriod('week')} className={period === 'week' ? 'active small' : 'small'}>
-                        Theo Tuần
+                        {t('buttons.byWeek')}
                     </button>
                 </div>
             )}
 
-            {/* Bo chuyen doi phu cho Phan Bo */}
             {view === 'distribution' && (
                 <div className="view-switcher" style={{ marginTop: '-10px', marginBottom: '20px' }}>
                     <button onClick={() => setDistributionView('bySession')} className={distributionView === 'bySession' ? 'active small' : 'small'}>
-                        Theo Buổi
+                        {t('buttons.bySession')}
                     </button>
                     <button onClick={() => setDistributionView('byHour')} className={distributionView === 'byHour' ? 'active small' : 'small'}>
-                        Theo Giờ
+                        {t('buttons.byTime')}
                     </button>
                 </div>
             )}

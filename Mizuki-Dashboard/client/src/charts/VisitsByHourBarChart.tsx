@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions } from 'chart.js';
+import { useLanguage } from '@/hooks/useLanguage';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const VisitsByHourBarChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
     const [loading, setLoading] = useState(true);
+    const { t } = useLanguage();
 
     useEffect(() => {
         fetch('/api/stats/visits-by-hour')
@@ -29,7 +31,7 @@ const VisitsByHourBarChart = () => {
                 setChartData({
                     labels,
                     datasets: [{
-                        label: 'Số lượt truy cập',
+                        label: t('chartLabels.visits'),
                         data: counts,
                         backgroundColor: '#7dcfff90',
                         borderColor: '#7dcfff',
@@ -39,7 +41,7 @@ const VisitsByHourBarChart = () => {
                 });
                 setLoading(false);
             });
-    }, []);
+    }, [t]);
 
     const options: ChartOptions<'bar'> = {
         responsive: true,
@@ -60,7 +62,7 @@ const VisitsByHourBarChart = () => {
         }
     };
 
-    if (loading) return <p>Đang tải...</p>;
+    if (loading) return <p>{t('loading')}</p>;
 
     return (
         <div className="chart-container">

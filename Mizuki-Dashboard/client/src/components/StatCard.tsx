@@ -14,7 +14,7 @@ function StatCard({ title, value, unit, icon }: StatCardProps) {
       <div className="stat-card-info">
         <p className="stat-card-title">{title}</p>
         <p className="stat-card-value">
-          {value?.toLocaleString('vi-VN') ?? '...'}
+          {value?.toLocaleString() ?? '...'}
           {unit && <span className="stat-unit">{unit}</span>}
         </p>
       </div>

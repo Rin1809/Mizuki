@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Bubble } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, Tooltip, Legend, ChartOptions, BubbleController, ChartDataset } from 'chart.js';
+import { useLanguage } from '@/hooks/useLanguage';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, Tooltip, Legend, BubbleController);
 
-const dayLabels = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
 const hourLabels = Array.from({ length: 24 }, (_, i) => `${i}h`);
 
 const ActivityHeatmapChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
     const [loading, setLoading] = useState(true);
+    const { t } = useLanguage();
+    
+    // FIX: Lay truc tiep mang tu ham t(), ko can .split()
+    const dayLabels: string[] = t('chartLabels.days') as any;
 
     useEffect(() => {
         fetch('/api/stats/activity-by-time')
@@ -30,7 +34,7 @@ const ActivityHeatmapChart = () => {
                 }));
 
                 const dataset: ChartDataset<'bubble'> = {
-                    label: 'Lượt truy cập',
+                    label: t('chartLabels.visits'),
                     data: bubbleData,
                     backgroundColor: 'rgba(158, 206, 106, 0.7)',
                     borderColor: '#9ece6a',
@@ -43,7 +47,7 @@ const ActivityHeatmapChart = () => {
                 });
                 setLoading(false);
             });
-    }, []);
+    }, [t]);
 
     const options: ChartOptions<'bubble'> = {
         responsive: true,
@@ -54,7 +58,7 @@ const ActivityHeatmapChart = () => {
                 labels: hourLabels,
                 ticks: { color: '#c0caf5', autoSkip: true, maxTicksLimit: 12 },
                 grid: { color: 'rgba(192, 202, 245, 0.05)' },
-                title: { display: true, text: 'Giờ trong ngày', color: '#c0caf5' }
+                title: { display: true, text: t('chartLabels.hourOfDay'), color: '#c0caf5' }
             },
             y: {
                 type: 'category',
@@ -62,7 +66,7 @@ const ActivityHeatmapChart = () => {
                 offset: true,
                 ticks: { color: '#c0caf5' },
                 grid: { color: 'rgba(192, 202, 245, 0.1)' },
-                title: { display: true, text: 'Ngày trong tuần', color: '#c0caf5' }
+                title: { display: true, text: t('chartLabels.dayOfWeek'), color: '#c0caf5' }
             }
         },
         plugins: {
@@ -73,14 +77,14 @@ const ActivityHeatmapChart = () => {
                         const day = dayLabels[context.raw.y];
                         const hour = `${context.raw.x}h - ${context.raw.x + 1}h`;
                         const count = context.raw.v;
-                        return `${day}, ${hour}: ${count} lượt`;
+                        return `${day}, ${hour}: ${count} ${t('chartLabels.visits').toLowerCase()}`;
                     }
                 }
             }
         }
     };
 
-    if (loading) return <p>Đang tải...</p>;
+    if (loading) return <p>{t('loading')}</p>;
 
     return (
         <div className="analytics-content">

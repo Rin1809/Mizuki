@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartOptions } from 'chart.js';
+import { useLanguage } from "@/hooks/useLanguage";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -32,6 +33,7 @@ const PlatformAnalytics = () => {
     const [browserData, setBrowserData] = useState<any>({ datasets: [] });
     const [osData, setOsData] = useState<any>({ datasets: [] });
     const [loading, setLoading] = useState(true);
+    const { t } = useLanguage();
 
     useEffect(() => {
         fetch('/api/stats/platform-distribution')
@@ -41,30 +43,30 @@ const PlatformAnalytics = () => {
                     setBrowserData(createChartData(
                         data.byBrowser.map((d: any) => d.browser),
                         data.byBrowser.map((d: any) => d.count),
-                        'Trình duyệt'
+                        t('chartLabels.visits')
                     ));
                 }
                 if (data.byOs) {
                     setOsData(createChartData(
                         data.byOs.map((d: any) => d.os),
                         data.byOs.map((d: any) => d.count),
-                        'Hệ điều hành'
+                        t('chartLabels.visits')
                     ));
                 }
                 setLoading(false);
             });
-    }, []);
+    }, [t]);
 
-    if (loading) return <p>Đang tải...</p>;
+    if (loading) return <p>{t('loading')}</p>;
 
     return (
         <div className="analytics-wrapper">
             <div className="view-switcher">
                 <button onClick={() => setView('browser')} className={view === 'browser' ? 'active' : ''}>
-                    Theo Trình Duyệt
+                    {t('buttons.byBrowser')}
                 </button>
                 <button onClick={() => setView('os')} className={view === 'os' ? 'active' : ''}>
-                    Theo HĐH
+                    {t('buttons.byOs')}
                 </button>
             </div>
             <div className="analytics-content">

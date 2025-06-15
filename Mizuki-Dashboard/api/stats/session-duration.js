@@ -1,4 +1,3 @@
-// Mizuki-Dashboard/api/stats/session-duration.js
 const { pool } = require('../_lib/db.js');
 
 module.exports = async (req, res) => {
@@ -12,12 +11,12 @@ module.exports = async (req, res) => {
             )
             SELECT
                 CASE
-                    WHEN duration_seconds < 10 THEN '0-10 giây'
-                    WHEN duration_seconds < 30 THEN '10-30 giây'
-                    WHEN duration_seconds < 60 THEN '30-60 giây'
-                    WHEN duration_seconds < 300 THEN '1-5 phút'
-                    WHEN duration_seconds < 600 THEN '5-10 phút'
-                    ELSE '10+ phút'
+                    WHEN duration_seconds < 10 THEN '0-10s'
+                    WHEN duration_seconds < 30 THEN '10-30s'
+                    WHEN duration_seconds < 60 THEN '30-60s'
+                    WHEN duration_seconds < 300 THEN '1-5m'
+                    WHEN duration_seconds < 600 THEN '5-10m'
+                    ELSE '10m+'
                 END AS category,
                 COUNT(*) AS session_count
             FROM session_durations

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartOptions } from 'chart.js';
+import { useLanguage } from '@/hooks/useLanguage';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -12,6 +13,7 @@ const chartColors = [
 
 const TopIPDistributionChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
+    const { t, locale } = useLanguage();
 
     useEffect(() => {
         fetch('/api/stats/top-visitors')
@@ -27,7 +29,7 @@ const TopIPDistributionChart = () => {
                 const counts = topVisitors.map((d: any) => d.visit_count);
 
                 if (otherVisitors.length > 0) {
-                    labels.push('Địa chỉ IP khác');
+                    labels.push(t('chartLabels.otherIPs'));
                     const otherCount = otherVisitors.reduce((sum: number, visitor: any) => sum + visitor.visit_count, 0);
                     counts.push(otherCount);
                 }
@@ -35,7 +37,7 @@ const TopIPDistributionChart = () => {
                 setChartData({
                     labels,
                     datasets: [{
-                        label: 'Số lần truy cập',
+                        label: t('tables.visitCount'),
                         data: counts,
                         backgroundColor: chartColors.slice(0, labels.length),
                         borderColor: '#1a1b26',
@@ -43,7 +45,7 @@ const TopIPDistributionChart = () => {
                     }]
                 });
             });
-    }, []);
+    }, [t]);
 
     const options: ChartOptions<'pie'> = {
       responsive: true,
@@ -63,7 +65,7 @@ const TopIPDistributionChart = () => {
                     if (context.parsed !== null) {
                         const total = context.dataset.data.reduce((acc: number, val: number) => acc + val, 0);
                         const percentage = ((context.parsed / total) * 100).toFixed(1);
-                        label += `${context.parsed.toLocaleString('vi-VN')} (${percentage}%)`;
+                        label += `${context.parsed.toLocaleString(locale)} (${percentage}%)`;
                     }
                     return label;
                 }

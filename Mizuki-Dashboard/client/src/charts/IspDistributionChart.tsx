@@ -1,12 +1,13 @@
-// Mizuki-Dashboard/client/src/charts/IspDistributionChart.tsx
 import { useState, useEffect } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions } from 'chart.js';
+import { useLanguage } from '@/hooks/useLanguage';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const IspDistributionChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
+    const { t } = useLanguage();
 
     useEffect(() => {
         fetch('/api/stats/isp-distribution')
@@ -20,7 +21,7 @@ const IspDistributionChart = () => {
                 setChartData({
                     labels,
                     datasets: [{
-                        label: 'Số lượt truy cập',
+                        label: t('chartLabels.visits'),
                         data: counts,
                         backgroundColor: '#ff9e64',
                         borderColor: '#d47a46',
@@ -28,7 +29,7 @@ const IspDistributionChart = () => {
                     }]
                 });
             });
-    }, []);
+    }, [t]);
 
     const options: ChartOptions<'bar'> = {
       responsive: true,

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useLanguage } from '@/hooks/useLanguage';
 
 const LiveStat = () => {
     const [liveCount, setLiveCount] = useState<number | null>(null);
+    const { t } = useLanguage();
 
     const fetchLiveCount = () => {
         fetch('/api/stats/live-visitors')
@@ -14,7 +16,7 @@ const LiveStat = () => {
 
     useEffect(() => {
         fetchLiveCount();
-        const interval = setInterval(fetchLiveCount, 15000); // cap nhat moi 15s
+        const interval = setInterval(fetchLiveCount, 15000);
         return () => clearInterval(interval);
     }, []);
 
@@ -25,7 +27,7 @@ const LiveStat = () => {
             </div>
             <div className="live-text">
                 <span className="live-count">{liveCount ?? '...'}</span>
-                <span>Online</span>
+                <span>{t('live')}</span>
             </div>
         </div>
     );

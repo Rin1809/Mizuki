@@ -1,7 +1,7 @@
-// Mizuki-Dashboard/client/src/components/TopVisitorsTable.tsx
 import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { vi } from 'date-fns/locale';
+import { useLanguage } from '@/hooks/useLanguage';
+import { dateLocales } from '@/lib/dateLocales';
 
 interface TopVisitor {
   ip_address: string;
@@ -12,6 +12,7 @@ interface TopVisitor {
 const TopVisitorsTable = () => {
   const [visitors, setVisitors] = useState<TopVisitor[]>([]);
   const [loading, setLoading] = useState(true);
+  const { t, locale } = useLanguage();
 
   useEffect(() => {
     fetch('/api/stats/top-visitors')
@@ -29,11 +30,11 @@ const TopVisitorsTable = () => {
   }, []);
 
   if (loading) {
-    return <p>Đang tải dữ liệu...</p>;
+    return <p>{t('loading')}</p>;
   }
 
   if (visitors.length === 0) {
-    return <p>Không có dữ liệu.</p>;
+    return <p>{t('noData')}</p>;
   }
 
   return (
@@ -41,20 +42,20 @@ const TopVisitorsTable = () => {
       <table>
         <thead>
           <tr>
-            <th>Địa chỉ IP</th>
-            <th>Số lần truy cập</th>
-            <th>Lần cuối truy cập</th>
+            <th>{t('tables.ipAddress')}</th>
+            <th>{t('tables.visitCount')}</th>
+            <th>{t('tables.lastVisit')}</th>
           </tr>
         </thead>
         <tbody>
           {visitors.map((visitor) => (
             <tr key={visitor.ip_address}>
               <td><code>{visitor.ip_address}</code></td>
-              <td>{visitor.visit_count.toLocaleString('vi-VN')}</td>
+              <td>{visitor.visit_count.toLocaleString(locale)}</td>
               <td>
                 {formatDistanceToNow(new Date(visitor.last_visit), {
                   addSuffix: true,
-                  locale: vi
+                  locale: dateLocales[locale]
                 })}
               </td>
             </tr>

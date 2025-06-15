@@ -1,4 +1,3 @@
-// Mizuki-Dashboard/api/stats/visitor-distribution.js
 const { pool } = require('../_lib/db.js');
 
 module.exports = async (req, res) => {
@@ -11,10 +10,10 @@ module.exports = async (req, res) => {
             )
             SELECT
               CASE
-                WHEN visit_count = 1 THEN '1 Lần (Khách mới)'
-                WHEN visit_count BETWEEN 2 AND 3 THEN '2-3 Lần'
-                WHEN visit_count BETWEEN 4 AND 5 THEN '4-5 Lần'
-                ELSE '6+ Lần (Khách quen)'
+                WHEN visit_count = 1 THEN '1_time'
+                WHEN visit_count BETWEEN 2 AND 3 THEN '2-3_times'
+                WHEN visit_count BETWEEN 4 AND 5 THEN '4-5_times'
+                ELSE '6+_times'
               END AS category,
               COUNT(*) AS num_visitors
             FROM visit_counts

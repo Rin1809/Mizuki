@@ -1,12 +1,13 @@
-// Mizuki-Dashboard/client/src/charts/TopCitiesChart.tsx
 import { useState, useEffect } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions } from 'chart.js';
+import { useLanguage } from '@/hooks/useLanguage';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const TopCitiesChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
+    const { t } = useLanguage();
 
     useEffect(() => {
         fetch('/api/stats/city-distribution')
@@ -14,14 +15,13 @@ const TopCitiesChart = () => {
             .then(data => {
                 if (!data || !data.cityDistribution) return;
                 
-                // hien thi city, country
                 const labels = data.cityDistribution.map((d: any) => `${d.city}, ${d.country}`);
                 const counts = data.cityDistribution.map((d: any) => d.count);
                 
                 setChartData({
                     labels,
                     datasets: [{
-                        label: 'Lượt truy cập',
+                        label: t('chartLabels.visits'),
                         data: counts,
                         backgroundColor: '#e0af68',
                         borderColor: '#b18b53',
@@ -29,7 +29,7 @@ const TopCitiesChart = () => {
                     }]
                 });
             });
-    }, []);
+    }, [t]);
 
     const options: ChartOptions<'bar'> = {
       responsive: true,

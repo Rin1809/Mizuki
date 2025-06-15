@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, ChartOptions, Filler } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import { vi } from 'date-fns/locale';
+import { useLanguage } from '@/hooks/useLanguage';
+import { dateLocales } from '@/lib/dateLocales';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, Filler);
 
@@ -10,14 +11,9 @@ interface VisitsByTimeChartProps {
   period: 'hour' | 'day' | 'week';
 }
 
-const periodLabels = {
-    hour: 'giờ (3 ngày qua)',
-    day: 'ngày (30 ngày qua)',
-    week: 'tuần (6 tháng qua)'
-};
-
 const VisitsByTimeChart = ({ period }: VisitsByTimeChartProps) => {
   const [chartData, setChartData] = useState<any>({ datasets: [] });
+  const { t, locale } = useLanguage();
 
   useEffect(() => {
     fetch(`/api/stats/visits?period=${period}`)
@@ -29,7 +25,7 @@ const VisitsByTimeChart = ({ period }: VisitsByTimeChartProps) => {
         setChartData({
           labels,
           datasets: [{
-            label: `Lượt truy cập theo ${periodLabels[period] || period}`,
+            label: `${t('chartLabels.visits')} ${t(`chartLabels.period.${period}`)}`,
             data: visitCounts,
             borderColor: 'rgb(137, 180, 250)',
             backgroundColor: 'rgba(137, 180, 250, 0.2)',
@@ -44,7 +40,7 @@ const VisitsByTimeChart = ({ period }: VisitsByTimeChartProps) => {
           }]
         });
       });
-  }, [period]);
+  }, [period, t]);
 
   const options: ChartOptions<'line'> = {
     responsive: true,
@@ -56,7 +52,7 @@ const VisitsByTimeChart = ({ period }: VisitsByTimeChartProps) => {
             unit: period as 'hour' | 'day' | 'week' | 'month',
             tooltipFormat: period === 'hour' ? 'dd/MM HH:mm' : 'dd/MM/yyyy'
         },
-        adapters: { date: { locale: vi } },
+        adapters: { date: { locale: dateLocales[locale] } },
         ticks: { color: '#c0caf5' },
         grid: { color: 'rgba(192, 202, 245, 0.1)' }
       },

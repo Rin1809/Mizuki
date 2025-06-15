@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartOptions } from 'chart.js';
+import { useLanguage } from '@/hooks/useLanguage';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -9,6 +10,7 @@ const chartColors = ['#e0af68', '#7dcfff', '#bb9af7', '#565f89'];
 const VisitsByTimeOfDayPieChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
     const [loading, setLoading] = useState(true);
+    const { t, locale } = useLanguage();
 
     useEffect(() => {
         fetch('/api/stats/visits-by-time-of-day')
@@ -18,13 +20,13 @@ const VisitsByTimeOfDayPieChart = () => {
                     setLoading(false);
                     return;
                 }
-                const labels = data.distribution.map((d: any) => d.time_of_day);
+                const labels = data.distribution.map((d: any) => t(`chartLabels.timeOfDay.${d.time_of_day}`));
                 const counts = data.distribution.map((d: any) => d.count);
                 
                 setChartData({
                     labels,
                     datasets: [{
-                        label: 'Số lượt truy cập',
+                        label: t('chartLabels.visits'),
                         data: counts,
                         backgroundColor: chartColors.slice(0, labels.length),
                         borderColor: '#1a1b26',
@@ -33,7 +35,7 @@ const VisitsByTimeOfDayPieChart = () => {
                 });
                 setLoading(false);
             });
-    }, []);
+    }, [t]);
 
     const options: ChartOptions<'pie'> = {
         responsive: true,
@@ -51,7 +53,7 @@ const VisitsByTimeOfDayPieChart = () => {
                         if (context.parsed !== null) {
                             const total = context.dataset.data.reduce((acc: number, val: number) => acc + val, 0);
                             const percentage = ((context.parsed / total) * 100).toFixed(1);
-                            label += `${context.parsed.toLocaleString('vi-VN')} (${percentage}%)`;
+                            label += `${context.parsed.toLocaleString(locale)} (${percentage}%)`;
                         }
                         return label;
                     }
@@ -60,7 +62,7 @@ const VisitsByTimeOfDayPieChart = () => {
         }
     };
 
-    if (loading) return <p>Đang tải...</p>;
+    if (loading) return <p>{t('loading')}</p>;
 
     return (
         <div className="chart-container">

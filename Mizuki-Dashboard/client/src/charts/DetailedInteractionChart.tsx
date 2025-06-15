@@ -1,9 +1,9 @@
-// Mizuki-Dashboard/client/src/charts/DetailedInteractionChart.tsx
 import { useState, useEffect } from 'react';
 import { Bar, Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, ChartOptions, Filler, ChartDataset } from 'chart.js';
 import 'chartjs-adapter-date-fns';
-import { vi } from 'date-fns/locale';
+import { useLanguage } from '@/hooks/useLanguage';
+import { dateLocales } from '@/lib/dateLocales';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, TimeScale, Filler);
 
@@ -11,14 +11,16 @@ interface DetailedInteractionChartProps {
     type: 'about-subsections' | 'gallery-hotspots' | 'guestbook-trends';
 }
 
-const chartConfig = {
-    'about-subsections': { type: 'bar' as const, label: 'Lượt xem mục', color: '#b9f27c' },
-    'gallery-hotspots': { type: 'bar' as const, label: 'Lượt xem ảnh', color: '#ff9e64' },
-    'guestbook-trends': { type: 'line' as const, label: 'Lượt gửi', color: '#f7768e' },
-};
-
 const DetailedInteractionChart = ({ type }: DetailedInteractionChartProps) => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
+    const { t, locale } = useLanguage();
+
+    const chartConfig = {
+      'about-subsections': { type: 'bar' as const, label: t('chartLabels.viewedSection'), color: '#b9f27c' },
+      'gallery-hotspots': { type: 'bar' as const, label: t('chartLabels.viewedImage'), color: '#ff9e64' },
+      'guestbook-trends': { type: 'line' as const, label: t('chartLabels.submittedEntry'), color: '#f7768e' },
+    };
+    
     const config = chartConfig[type];
 
     useEffect(() => {
@@ -33,11 +35,10 @@ const DetailedInteractionChart = ({ type }: DetailedInteractionChartProps) => {
 
                 if (type === 'gallery-hotspots') {
                     labels.forEach((label: string, index: number) => {
-                       labels[index] = `Ảnh ${parseInt(label, 10) + 1}`;
+                       labels[index] = `${t('chartLabels.image')} ${parseInt(label, 10) + 1}`;
                     });
                 }
 
-                // tao dataset mot cach an toan cho typescript
                 const baseDataset = {
                     label: config.label,
                     data: counts,
@@ -50,20 +51,14 @@ const DetailedInteractionChart = ({ type }: DetailedInteractionChartProps) => {
                 let dataset: ChartDataset<typeof config.type>;
 
                 if (config.type === 'line') {
-                    dataset = {
-                        ...baseDataset,
-                        fill: true,
-                    };
+                    dataset = { ...baseDataset, fill: true };
                 } else {
                     dataset = baseDataset;
                 }
                 
-                setChartData({
-                    labels,
-                    datasets: [dataset],
-                });
+                setChartData({ labels, datasets: [dataset] });
             });
-    }, [type, config]);
+    }, [type, t]);
 
     const options: ChartOptions<any> = {
       responsive: true,
@@ -73,7 +68,7 @@ const DetailedInteractionChart = ({ type }: DetailedInteractionChartProps) => {
           x: { 
             type: config.type === 'line' ? 'time' : 'linear',
             time: { unit: 'day' },
-            adapters: { date: { locale: vi } },
+            adapters: { date: { locale: dateLocales[locale] } },
             ticks: { color: '#c0caf5' },
             grid: { color: 'rgba(192, 202, 245, 0.1)' }
           },

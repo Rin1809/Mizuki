@@ -1,13 +1,94 @@
+# =========================
+# Quy tắc chung
+# =========================
+
+# File biên dịch và log
+*.log
+*.log.*
+*.logs
+*.tmp
+
+# Các file cấu hình của IDE
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# File hệ điều hành
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# =========================
+# Quy tắc cho Python (Dự án Mizuki)
+# =========================
+
+# File môi trường ảo
+moitruongao/
+venv/
+env/
+.venv/
+*/.venv/
+
+# File cache của Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# File package và build của Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.so
+*.manifest
+*.spec
+
+# File test của Python
+.pytest_cache/
+.coverage
+.tox/
+htmlcov/
+nosetests.xml
+coverage.xml
+
 
 .env
-moitruongao/
-server_logs/
-*.log
+.env.*
+*/.env
+*/.env.*
+!/.env.example
+!/.env.template
 
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# =========================
+# Quy tắc cho Node.js (Dự án Mizuki-Dashboard)
+# =========================
 
-.vscode/
-.idea/
+# Thư mục chứa các package đã cài đặt
+node_modules/
+*/node_modules/
+
+# File log của npm và yarn
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+
+
+# Thư mục build của Vite
+dist/
+*/dist/
+
+# File cấu hình local của Vite
+.vite/
+*/.vite/
+
+# File tạm của các công cụ test
+/coverage
+
+# Các file khác
+.npm
+.pnp.*

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 // dung alias @ de chi vao thu muc src
 import StatCard from '@/components/StatCard';

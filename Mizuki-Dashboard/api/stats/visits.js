@@ -1,17 +1,36 @@
 const { pool } = require('../_lib/db.js');
 
 module.exports = async (req, res) => {
-    const { period = 'day' } = req.query;
+    // mac dinh la gio
+    const { period = 'hour' } = req.query;
 
-    if (!['day', 'week', 'month'].includes(period)) {
+    if (!['hour', 'day', 'week', 'month'].includes(period)) {
         return res.status(400).json({ error: 'Thoi gian ko hop le.' });
     }
     
+    let interval;
+    let groupBy = `DATE_TRUNC($1, visit_time)`;
+
+    switch (period) {
+        case 'hour':
+            interval = `72 hour`;
+            break;
+        case 'day':
+            interval = `30 day`;
+            break;
+        case 'week':
+            interval = `26 week`;
+            break;
+        case 'month':
+            interval = `12 month`;
+            break;
+    }
+
     try {
         const visitsByTimeRes = await pool.query(
-            `SELECT DATE_TRUNC($1, visit_time) AS date, COUNT(*) AS count
+            `SELECT ${groupBy} AS date, COUNT(*) AS count
              FROM visits
-             WHERE visit_time > NOW() - INTERVAL '1 year'
+             WHERE visit_time > NOW() - INTERVAL '${interval}'
              GROUP BY date
              ORDER BY date ASC;`,
             [period]

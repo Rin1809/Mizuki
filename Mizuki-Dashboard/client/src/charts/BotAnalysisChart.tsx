@@ -1,30 +1,28 @@
+// Mizuki-Dashboard/client/src/charts/BotAnalysisChart.tsx
 import { useState, useEffect } from 'react';
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartOptions } from 'chart.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-const chartColors = [
-    '#bb9af7', '#7dcfff', '#73daca', '#b9f27c', '#ff9e64',
-    '#f7768e', '#e0af68', '#9ece6a', '#c0caf5', '#2ac3de'
-];
+const chartColors = ['#f7768e', '#ff9e64', '#e0af68', '#b9f27c', '#73daca', '#7dcfff', '#bb9af7'];
 
-const CountryDistributionChart = () => {
+const BotAnalysisChart = () => {
     const [chartData, setChartData] = useState<any>({ datasets: [] });
 
     useEffect(() => {
-        fetch('/api/stats/visits')
+        fetch('/api/stats/bot-analysis')
             .then(res => res.json())
             .then(data => {
-                if (!data || !data.byCountry) return;
-                const labels = data.byCountry.map((d: any) => d.country);
-                const counts = data.byCountry.map((d: any) => d.count);
+                if (!data || !data.botDistribution) return;
+                const labels = data.botDistribution.map((d: any) => d.bot_type);
+                const counts = data.botDistribution.map((d: any) => d.count);
                 setChartData({
                     labels,
                     datasets: [{
                         label: 'Lượt truy cập',
                         data: counts,
-                        backgroundColor: chartColors.slice(0, labels.length),
+                        backgroundColor: chartColors,
                         borderColor: '#1a1b26',
                         borderWidth: 2,
                     }]
@@ -37,9 +35,9 @@ const CountryDistributionChart = () => {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          position: 'bottom',
+          position: 'right',
           labels: { color: '#c0caf5' }
-        }
+        },
       }
     };
 
@@ -50,4 +48,4 @@ const CountryDistributionChart = () => {
     );
 };
 
-export default CountryDistributionChart;
+export default BotAnalysisChart;
